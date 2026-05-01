@@ -1,0 +1,158 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Building2, Mail, MessageCircle, Phone, UserRound } from "lucide-react";
+import { authStorageKey, createLocalAccount, isValidEmail, isValidPhone, type LocalAccount } from "@/lib/auth";
+
+type AuthMode = "login" | "register";
+type Method = "email" | "phone";
+
+export function AuthPanel({ mode }: { mode: AuthMode }) {
+  const router = useRouter();
+  const [method, setMethod] = useState<Method>("phone");
+  const [role, setRole] = useState<LocalAccount["role"]>("buyer");
+  const [identifier, setIdentifier] = useState("");
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const isRegister = mode === "register";
+
+  return (
+    <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-200 md:p-8">
+      <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-100 p-1">
+        {[
+          ["phone", "手机号"],
+          ["email", "邮箱"]
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={`rounded-lg px-4 py-2 text-sm font-semibold ${method === value ? "bg-white text-stone-950 shadow-sm" : "text-stone-500"}`}
+            onClick={() => {
+              setMethod(value as Method);
+              setError("");
+              setMessage("");
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {isRegister ? (
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          {[
+            ["buyer", UserRound, "企业用户"],
+            ["provider", Building2, "服务商"]
+          ].map(([value, Icon, label]) => (
+            <button
+              key={value as string}
+              type="button"
+              className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
+                role === value ? "border-orange-300 bg-amber-100 text-amber-900" : "border-stone-200 text-stone-600"
+              }`}
+              onClick={() => setRole(value as LocalAccount["role"])}
+            >
+              <Icon className="h-4 w-4" />
+              {label as string}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <form
+        className="mt-6 space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setError("");
+          setMessage("");
+          const normalized = validateIdentifier(method, identifier);
+          if (!normalized.ok) {
+            setError(normalized.message);
+            return;
+          }
+          if (method === "phone" && !/^\d{6}$/.test(code.trim())) {
+            setError("请输入 6 位短信验证码。当前为预留流程，可使用任意 6 位数字。");
+            return;
+          }
+          if (method === "email" && password.trim().length < 6) {
+            setError("请输入至少 6 位密码。当前为前端预留登录流程。");
+            return;
+          }
+          const account = createLocalAccount(method, normalized.value, isRegister ? role : "buyer");
+          window.localStorage.setItem(authStorageKey, JSON.stringify(account));
+          setMessage(isRegister ? "注册成功，正在进入账号页。" : "登录成功，正在进入账号页。");
+          window.setTimeout(() => router.push("/account"), 350);
+        }}
+      >
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-stone-700">{method === "phone" ? "手机号" : "邮箱"}</span>
+          <div className="relative">
+            {method === "phone" ? <Phone className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-stone-400" /> : <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-stone-400" />}
+            <input
+              className="field pl-10"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder={method === "phone" ? "请输入中国大陆手机号" : "name@example.com"}
+              type={method === "phone" ? "tel" : "email"}
+              required
+            />
+          </div>
+        </label>
+        {method === "phone" ? (
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-stone-700">短信验证码</span>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <input className="field" value={code} onChange={(event) => setCode(event.target.value)} placeholder="任意 6 位数字" inputMode="numeric" required />
+              <button type="button" className="rounded-xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50" onClick={() => setMessage("验证码接口已预留：后续接入短信服务商后会真实发送。")}>
+                获取验证码
+              </button>
+            </div>
+          </label>
+        ) : (
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-stone-700">密码</span>
+            <input className="field" value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="至少 6 位" required />
+          </label>
+        )}
+
+        {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+        {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
+
+        <button type="submit" className="w-full rounded-xl bg-[var(--color-brand)] px-5 py-3.5 font-semibold text-white hover:bg-[var(--color-brand-hover)]">
+          {isRegister ? "创建账号" : "登录"}
+        </button>
+      </form>
+
+      <div className="mt-6 border-t border-stone-100 pt-5">
+        <p className="mb-3 text-xs font-semibold text-stone-400">预留第三方登录</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <ReservedAuthButton label="微信" icon={<MessageCircle className="h-4 w-4" />} />
+          <ReservedAuthButton label="企业微信" icon={<Building2 className="h-4 w-4" />} />
+          <ReservedAuthButton label="飞书" icon={<MessageCircle className="h-4 w-4" />} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReservedAuthButton({ label, icon }: { label: string; icon: React.ReactNode }) {
+  return (
+    <button type="button" disabled className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-400">
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function validateIdentifier(method: Method, value: string): { ok: true; value: string } | { ok: false; message: string } {
+  if (method === "email") {
+    if (!isValidEmail(value)) return { ok: false, message: "请输入有效邮箱地址。" };
+    return { ok: true, value };
+  }
+  if (!isValidPhone(value)) return { ok: false, message: "请输入有效的中国大陆手机号。" };
+  return { ok: true, value };
+}

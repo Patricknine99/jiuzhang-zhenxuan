@@ -3,6 +3,7 @@ import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 import { Footer } from "@/components/shared/Footer";
 import { Navbar } from "@/components/shared/Navbar";
+import { FloatingSupport } from "@/components/support/FloatingSupport";
 
 const sans = Noto_Sans_SC({
   subsets: ["latin"],
@@ -43,6 +44,7 @@ export default function RootLayout({
         <Navbar />
         <main>{children}</main>
         <Footer />
+        <FloatingSupport />
       </body>
     </html>
   );

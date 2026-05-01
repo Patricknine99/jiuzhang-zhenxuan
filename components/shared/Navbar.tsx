@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Send } from "lucide-react";
+import { ChevronDown, LogIn, Send } from "lucide-react";
 import { industryCategories, serviceCategories } from "@/lib/catalog";
 
 export function Navbar() {
@@ -54,15 +54,19 @@ export function Navbar() {
           </Link>
         </div>
         <div className="flex items-center gap-3">
-          <Link className="hidden text-sm font-medium text-stone-600 hover:text-stone-950 sm:block" href="/join">
+          <Link className="hidden text-sm font-medium text-stone-600 hover:text-stone-950 lg:block" href="/join">
             服务商入驻
+          </Link>
+          <Link className="hidden items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-950 sm:inline-flex" href="/login">
+            <LogIn className="h-4 w-4" />
+            登录
           </Link>
           <Link
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-orange-900/10 hover:bg-[var(--color-brand-hover)]"
-            href="/post-demand"
+            href="/diagnosis"
           >
             <Send className="h-4 w-4" />
-            发布需求
+            AI 诊断
           </Link>
         </div>
       </nav>
@@ -79,6 +83,9 @@ export function Navbar() {
           </Link>
           <Link href="/sla" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             验收标准
+          </Link>
+          <Link href="/login" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+            登录
           </Link>
         </div>
       </nav>

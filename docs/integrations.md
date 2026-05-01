@@ -74,6 +74,16 @@ DINGTALK_AT_MOBILES=
 
 当前主站未配置 `NEXT_PUBLIC_LEAD_RELAY_URL` 时，表单会以静态 Demo 模式直接进入成功页；配置后会向 relay 发送真实请求。
 
+## 8. AI 与账号接口预留
+
+由 ChatGPT 于 2026-05-01 补充：
+
+- AI 需求诊断页：`/diagnosis`
+- 诊断 AI 接口环境变量：`NEXT_PUBLIC_DIAGNOSIS_AI_URL`
+- 悬浮客服 AI 接口环境变量：`NEXT_PUBLIC_SUPPORT_AI_URL`
+- 当前账号页：`/login`、`/register`、`/account`
+- 当前已做手机号/邮箱前端注册登录流程，真实短信、邮箱登录、微信、企业微信、飞书 OAuth 仍需后端用户系统支持。
+
 ## 7. 后端稳定性补充
 
 由 ChatGPT 于 2026-05-01 补充：

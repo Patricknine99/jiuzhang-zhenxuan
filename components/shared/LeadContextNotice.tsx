@@ -10,8 +10,9 @@ export function LeadContextNotice() {
   const caseSlug = searchParams.get("case");
   const service = searchParams.get("service");
   const industry = searchParams.get("industry");
+  const diagnosis = searchParams.get("diagnosis");
 
-  const context = getContextText({ provider, caseSlug, service, industry });
+  const context = getContextText({ provider, caseSlug, service, industry, diagnosis });
   if (!context) return null;
 
   return (
@@ -26,12 +27,14 @@ function getContextText({
   provider,
   caseSlug,
   service,
-  industry
+  industry,
+  diagnosis
 }: {
   provider: string | null;
   caseSlug: string | null;
   service: string | null;
   industry: string | null;
+  diagnosis: string | null;
 }) {
   if (provider) {
     const item = getProvider(provider);
@@ -49,5 +52,6 @@ function getContextText({
     const item = getIndustryCategory(industry);
     return item ? `行业「${item.title}」` : `行业 ${industry}`;
   }
+  if (diagnosis) return `AI 诊断摘要「${diagnosis.slice(0, 80)}」`;
   return "";
 }

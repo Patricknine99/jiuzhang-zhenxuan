@@ -24,7 +24,7 @@ export default function HomePage() {
         </p>
         <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
           <Link
-            href="/post-demand"
+            href="/diagnosis"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-8 py-4 font-semibold text-white shadow-lg shadow-orange-900/20 hover:bg-[var(--color-brand-hover)]"
           >
             <Search className="h-5 w-5" />
@@ -148,8 +148,8 @@ export default function HomePage() {
             eyebrow="面向企业 / 品牌方 / 中小商家"
             title="我需要 AI 解决方案"
             text="告诉我们你的业务痛点与预算，平台帮你筛选匹配 2-3 家经过商业验证的服务商。"
-            href="/post-demand"
-            action="免费发布需求"
+            href="/diagnosis"
+            action="免费诊断需求"
             icon="search"
           />
           <AudienceCard
@@ -170,7 +170,7 @@ export default function HomePage() {
           把业务痛点告诉我们。平台产品经理帮你拆解需求、预估报价，并匹配合适的验证服务商。
         </p>
         <Link
-          href="/post-demand"
+          href="/diagnosis"
           className="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-9 py-4 text-lg font-bold text-white shadow-lg shadow-orange-900/20 hover:bg-[var(--color-brand-hover)]"
         >
           开始免费需求诊断 <ArrowRight className="h-5 w-5" />

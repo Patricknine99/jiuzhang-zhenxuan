@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FieldGroup } from "@/components/shared/FieldGroup";
 import { FormSection } from "@/components/shared/FormSection";
 import { StaticForm } from "@/components/shared/StaticForm";
@@ -14,6 +15,12 @@ export default function JoinPage() {
       title="申请成为精选服务商"
       description="平台会根据真实案例、交付能力、行业适配度进行初步筛选，3 个工作日内邮件通知审核结果。"
     >
+      <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-900">
+        建议先注册服务商账号，后续可查看审核状态和补充资料。当前账号系统已支持手机号和邮箱。{" "}
+        <Link href="/register" className="font-semibold text-[var(--color-brand)]">
+          去注册服务商账号
+        </Link>
+      </div>
       <StaticForm successPath="/join/success" leadType="application">
         <FieldGroup label="团队/个人名称" required>
           <input className="field" name="teamName" required />
