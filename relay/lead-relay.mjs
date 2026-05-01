@@ -7,6 +7,8 @@ const MAX_BODY_BYTES = 64 * 1024;
 const REQUEST_TIMEOUT_MS = Number(process.env.LEAD_REQUEST_TIMEOUT_MS || 8000);
 const RATE_LIMIT_WINDOW_MS = Number(process.env.LEAD_RATE_LIMIT_WINDOW_MS || 60_000);
 const RATE_LIMIT_MAX = Number(process.env.LEAD_RATE_LIMIT_MAX || 20);
+const CHANNEL_RETRY_COUNT = Number(process.env.LEAD_CHANNEL_RETRY_COUNT || 1);
+const CHANNEL_RETRY_BASE_MS = Number(process.env.LEAD_CHANNEL_RETRY_BASE_MS || 250);
 
 const CHANNELS = parseChannels(process.env.LEAD_CHANNELS || "feishu");
 const ALLOWED_ORIGINS = parseList(process.env.LEAD_ALLOWED_ORIGINS || "*");
@@ -35,6 +37,14 @@ const server = createServer(async (request, response) => {
       dryRun: DRY_RUN,
       channels: CHANNELS,
       database: "reserved",
+      rateLimit: {
+        windowMs: RATE_LIMIT_WINDOW_MS,
+        max: RATE_LIMIT_MAX
+      },
+      retry: {
+        count: CHANNEL_RETRY_COUNT,
+        baseMs: CHANNEL_RETRY_BASE_MS
+      },
       requestId
     });
     return;
@@ -116,9 +126,9 @@ async function submitLeadToChannels(payload, channels) {
   const channelResults = await Promise.all(
     uniqueChannels.map(async (channel) => {
       try {
-        if (channel === "feishu") return await withTimeout(submitToFeishu(payload), REQUEST_TIMEOUT_MS, "Feishu request timed out");
-        if (channel === "wecom") return await withTimeout(submitToWeCom(payload), REQUEST_TIMEOUT_MS, "WeCom request timed out");
-        if (channel === "dingtalk") return await withTimeout(submitToDingTalk(payload), REQUEST_TIMEOUT_MS, "DingTalk request timed out");
+        if (channel === "feishu") return await submitWithRetry(channel, () => submitToFeishu(payload), "Feishu request timed out");
+        if (channel === "wecom") return await submitWithRetry(channel, () => submitToWeCom(payload), "WeCom request timed out");
+        if (channel === "dingtalk") return await submitWithRetry(channel, () => submitToDingTalk(payload), "DingTalk request timed out");
         return { ok: false, channel, message: "Unsupported channel" };
       } catch (error) {
         return {
@@ -130,6 +140,23 @@ async function submitLeadToChannels(payload, channels) {
     })
   );
   return [databaseResult, ...channelResults];
+}
+
+async function submitWithRetry(channel, submit, timeoutMessage) {
+  let lastError;
+  const maxAttempts = Math.max(1, CHANNEL_RETRY_COUNT + 1);
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await withTimeout(submit(), REQUEST_TIMEOUT_MS, timeoutMessage);
+      return attempt > 1 ? { ...result, message: `${result.message} after ${attempt} attempts` } : result;
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) await delay(CHANNEL_RETRY_BASE_MS * attempt);
+    }
+  }
+  throw new Error(
+    `${channel} failed after ${maxAttempts} attempts: ${lastError instanceof Error ? lastError.message : "Unknown error"}`
+  );
 }
 
 async function submitToFeishu(payload) {
@@ -431,6 +458,13 @@ function consumeRateLimit(key) {
   return { ok: true, retryAfterMs: 0 };
 }
 
+function cleanupRateLimitBuckets() {
+  const now = Date.now();
+  for (const [key, bucket] of RATE_LIMIT_BUCKETS.entries()) {
+    if (now > bucket.resetAt) RATE_LIMIT_BUCKETS.delete(key);
+  }
+}
+
 function getRequestId() {
   return `lead_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -441,6 +475,10 @@ function withTimeout(promise, timeoutMs, message) {
     timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout));
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseChannels(value) {
@@ -483,6 +521,8 @@ function shutdown(signal) {
     process.exit(0);
   });
 }
+
+setInterval(cleanupRateLimitBuckets, Math.max(60_000, RATE_LIMIT_WINDOW_MS)).unref();
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

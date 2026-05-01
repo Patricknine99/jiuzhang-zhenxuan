@@ -16,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/login",
     "/register",
     "/account",
+    "/status",
     "/post-demand",
     "/join",
     "/sla",

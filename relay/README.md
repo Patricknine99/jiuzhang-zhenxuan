@@ -55,6 +55,8 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - `LEAD_RELAY_SECRET` 使用强随机字符串
 - `LEAD_RATE_LIMIT_MAX` 按部署环境限流能力调整，默认每 IP 每分钟 20 次
 - `LEAD_REQUEST_TIMEOUT_MS` 控制单个外部渠道调用超时，默认 8000ms
+- `LEAD_CHANNEL_RETRY_COUNT` 控制外部渠道失败重试次数，默认 1 次
+- `LEAD_CHANNEL_RETRY_BASE_MS` 控制重试基础等待时间，默认 250ms
 - 飞书、企微、钉钉密钥只放 relay 环境变量
 
 ## 稳定性机制
@@ -62,8 +64,10 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - **统一响应**：所有错误返回 `{ ok: false, error, message, requestId }`，便于前端展示和人工排查。
 - **请求编号**：每次请求会返回 `X-Request-Id` 与 JSON `requestId`。
 - **基础限流**：内存级 IP 限流用于早期防刷；正式生产可叠加网关或云函数限流。
+- **限流清理**：内存限流桶会定时清理，避免长时间运行后累积过多过期 IP。
 - **请求约束**：限制 JSON body 64KB，并要求 `Content-Type: application/json`。
 - **渠道超时**：飞书、企微、钉钉单通道默认 8 秒超时，避免单个渠道拖垮整体提交。
+- **渠道重试**：外部渠道失败会按配置进行短重试，降低偶发网络抖动影响。
 - **优雅退出**：监听 `SIGINT` / `SIGTERM`，便于容器或进程管理器平滑停止。
 - **数据库占位**：`relay/database.mjs` 只保留接口，等数据库真实启用后在该文件内接入即可。
 

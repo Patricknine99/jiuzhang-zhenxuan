@@ -12,6 +12,7 @@ const routes = [
   "/login",
   "/register",
   "/account",
+  "/status",
   "/post-demand",
   "/join",
   "/sla",

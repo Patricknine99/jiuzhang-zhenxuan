@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integrations";
@@ -30,13 +30,23 @@ export function StaticForm({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [requestId, setRequestId] = useState("");
+  const draftKey = `jiuzhang:${leadType}:draft`;
+
+  useEffect(() => {
+    restoreDraft(formRef.current, draftKey);
+  }, [draftKey]);
 
   return (
     <form
+      ref={formRef}
       className="space-y-5"
+      onChange={(event) => {
+        saveDraft(event.currentTarget, draftKey);
+      }}
       onSubmit={async (event) => {
         event.preventDefault();
         setError("");
@@ -65,6 +75,7 @@ export function StaticForm({
           } else {
             rememberSubmission(leadType, { ok: true, message: "静态演示模式提交成功" }, "static-demo");
           }
+          window.localStorage.removeItem(draftKey);
           router.push(successPath);
         } catch (caught) {
           const message =
@@ -169,14 +180,53 @@ function getSubmitTimeoutMs() {
 
 function rememberSubmission(type: LeadPayload["type"], body: RelayResponse, requestId: string) {
   if (typeof window === "undefined") return;
+  const submission = {
+    type,
+    requestId,
+    ok: body.ok ?? true,
+    results: body.results || [],
+    submittedAt: new Date().toISOString()
+  };
   window.sessionStorage.setItem(
     "jiuzhang:lastLeadSubmission",
-    JSON.stringify({
-      type,
-      requestId,
-      ok: body.ok ?? true,
-      results: body.results || [],
-      submittedAt: new Date().toISOString()
-    })
+    JSON.stringify(submission)
   );
+  const raw = window.localStorage.getItem("jiuzhang:submissions");
+  const current = raw ? (JSON.parse(raw) as typeof submission[]) : [];
+  window.localStorage.setItem("jiuzhang:submissions", JSON.stringify([submission, ...current].slice(0, 10)));
+}
+
+function saveDraft(form: HTMLFormElement, draftKey: string) {
+  const data = new FormData(form);
+  const values: Record<string, FormDataEntryValue | FormDataEntryValue[]> = {};
+  for (const [key, value] of data.entries()) {
+    if (key in values) {
+      const existing = values[key];
+      values[key] = Array.isArray(existing) ? [...existing, value] : [existing, value];
+    } else {
+      values[key] = value;
+    }
+  }
+  window.localStorage.setItem(draftKey, JSON.stringify(values));
+}
+
+function restoreDraft(form: HTMLFormElement | null, draftKey: string) {
+  if (!form) return;
+  const raw = window.localStorage.getItem(draftKey);
+  if (!raw) return;
+  try {
+    const values = JSON.parse(raw) as Record<string, string | string[]>;
+    for (const element of Array.from(form.elements)) {
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) continue;
+      const value = values[element.name];
+      if (value === undefined) continue;
+      if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
+        element.checked = Array.isArray(value) ? value.includes(element.value) : value === element.value || value === "on";
+      } else {
+        element.value = Array.isArray(value) ? String(value[0] || "") : String(value);
+      }
+    }
+  } catch {
+    window.localStorage.removeItem(draftKey);
+  }
 }

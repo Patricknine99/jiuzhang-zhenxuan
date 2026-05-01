@@ -84,6 +84,16 @@ DINGTALK_AT_MOBILES=
 - 当前账号页：`/login`、`/register`、`/account`
 - 当前已做手机号/邮箱前端注册登录流程，真实短信、邮箱登录、微信、企业微信、飞书 OAuth 仍需后端用户系统支持。
 
+## 9. 灰度与生产检查
+
+由 ChatGPT 于 2026-05-02 补充：
+
+- 系统状态页：`/status`
+- 数据一致性检查：`npm run verify:data`
+- 路由 smoke test：`npm run smoke:routes`
+- 生产环境变量检查：`npm run check:env`
+- relay 已增加外部渠道短重试与限流桶清理，降低偶发网络拥堵影响。
+
 ## 7. 后端稳定性补充
 
 由 ChatGPT 于 2026-05-01 补充：
