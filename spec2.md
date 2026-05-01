@@ -141,3 +141,36 @@
   7. 数据一致性脚本通过：4 个服务商、3 个案例，slug 无重复，案例引用的服务商均存在。
   8. 表单页面检查通过：`/post-demand`、`/join` 均包含字段、提交按钮和安全中转说明。
   9. 页面 HTML 中未发现真实运行时错误；`error` 字符串命中来自 Next dev 自动注入的 global-error 脚本与样式。
+
+## 8. ChatGPT 修改记录（2026-05-01 二级菜单与 P0/P1/P2 可执行批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **用户反馈**：预览网页里的按钮没有二级菜单，也缺少明确的二级页面承接。
+- **优先级处理**：
+  1. **P0 已做**：新增导航二级下拉菜单；新增服务类型和行业二级落地页；服务商/案例/服务类型/行业入口跳转发布需求时带入上下文；relay 接收并分发 `context` 字段。
+  2. **P1 已做**：成功页读取最近一次提交记录并展示请求编号与渠道状态；新增 `verify:data`、`smoke:routes` 验证脚本；补充 `robots.txt` 与 `sitemap.xml`。
+  3. **P2 已做**：抽象 `lib/catalog.ts` 作为服务类型和行业目录层；新增服务类型与行业到服务商/案例的本地匹配逻辑，为后续飞书/数据库内容同步预留结构。
+- **新增页面**：
+  1. `/services`
+  2. `/services/ai-automation`
+  3. `/services/ecommerce-visuals`
+  4. `/services/content-pipeline`
+  5. `/services/private-knowledge`
+  6. `/industries/ecommerce`
+  7. `/industries/education-consulting`
+  8. `/industries/local-life-content`
+  9. `/industries/professional-services`
+  10. `/robots.txt`
+  11. `/sitemap.xml`
+- **主要文件**：
+  1. `components/shared/Navbar.tsx`：新增桌面端二级下拉和移动端服务类型入口。
+  2. `lib/catalog.ts`：新增服务类型、行业目录和匹配函数。
+  3. `app/services/*`、`app/industries/*`：新增二级落地页。
+  4. `components/shared/LeadContextNotice.tsx`：发布需求页展示并提交咨询上下文。
+  5. `components/shared/SubmissionSummary.tsx`：成功页展示请求编号与渠道状态。
+  6. `app/sitemap.ts`、`app/robots.ts`：新增 SEO 基础文件。
+  7. `scripts/verify-data.mjs`、`scripts/smoke-routes.mjs`：新增本地验证脚本。
+- **外部依赖未完成项说明**：
+  1. 真实飞书、企业微信、钉钉联调仍需实际密钥和目标表/群。
+  2. 真实数据库接入仍按要求保留空接口，暂不连接生产数据库。

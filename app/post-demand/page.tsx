@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { FieldGroup } from "@/components/shared/FieldGroup";
 import { FormSection } from "@/components/shared/FormSection";
+import { LeadContextNotice } from "@/components/shared/LeadContextNotice";
 import { StaticForm } from "@/components/shared/StaticForm";
 
 export const metadata: Metadata = {
@@ -15,6 +17,9 @@ export default function PostDemandPage() {
       description="不用先写完整 PRD。把业务痛点、预算范围和期望交付告诉我们，平台产品经理会先帮你判断方向和匹配服务商。"
     >
       <StaticForm successPath="/post-demand/success" leadType="demand">
+        <Suspense fallback={null}>
+          <LeadContextNotice />
+        </Suspense>
         <div className="grid gap-5 md:grid-cols-2">
           <FieldGroup label="公司名称" required>
             <input className="field" name="company" required />

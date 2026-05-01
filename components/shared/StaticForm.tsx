@@ -110,6 +110,7 @@ function buildLeadPayload(formData: FormData, leadType: LeadPayload["type"]): Le
       needRecommend: formData.get("needRecommend") === "on",
       phone: getOptionalString(formData, "phone"),
       wechat: getOptionalString(formData, "wechat"),
+      context: getOptionalString(formData, "context"),
       source: typeof window === "undefined" ? undefined : window.location.href
     } satisfies DemandLead;
     if (!payload.phone && !payload.wechat) {

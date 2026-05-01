@@ -31,6 +31,13 @@ export default function HomePage() {
             免费发布 AI 需求诊断
           </Link>
           <Link
+            href="/services"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-8 py-4 font-semibold text-stone-700 hover:border-stone-400 hover:bg-white"
+          >
+            <Sparkles className="h-5 w-5" />
+            浏览 AI 服务类型
+          </Link>
+          <Link
             href="/join"
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-8 py-4 font-semibold text-stone-700 hover:border-stone-400 hover:bg-white"
           >

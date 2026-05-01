@@ -11,6 +11,7 @@ export type DemandLead = {
   needRecommend: boolean;
   phone?: string;
   wechat?: string;
+  context?: string;
   source?: string;
 };
 
@@ -82,6 +83,7 @@ export function toNotificationText(payload: LeadPayload) {
       `需要推荐：${payload.needRecommend ? "是" : "否"}`,
       `手机号：${payload.phone || "未填写"}`,
       `微信号：${payload.wechat || "未填写"}`,
+      `咨询上下文：${payload.context || "未带入"}`,
       `业务痛点：${payload.painPoint}`
     ].join("\n");
   }

@@ -6,6 +6,8 @@
     "dev": "next dev",
     "relay:dev": "node relay/lead-relay.mjs",
     "relay:check": "node --check relay/lead-relay.mjs",
+    "verify:data": "node scripts/verify-data.mjs",
+    "smoke:routes": "node scripts/smoke-routes.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."

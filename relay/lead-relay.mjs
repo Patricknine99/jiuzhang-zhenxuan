@@ -240,6 +240,7 @@ function normalizeLeadPayload(body) {
       needRecommend: Boolean(body.needRecommend),
       phone: optionalString(body.phone),
       wechat: optionalString(body.wechat),
+      context: optionalString(body.context),
       source: optionalString(body.source)
     };
   }
@@ -279,6 +280,7 @@ function toFeishuFields(payload) {
       need_recommend: payload.needRecommend,
       phone: payload.phone || "",
       wechat: payload.wechat || "",
+      context: payload.context || "",
       created_at: Date.now()
     };
   }
@@ -308,6 +310,7 @@ function toNotificationText(payload) {
       `需要推荐：${payload.needRecommend ? "是" : "否"}`,
       `手机号：${payload.phone || "未填写"}`,
       `微信号：${payload.wechat || "未填写"}`,
+      `咨询上下文：${payload.context || "未带入"}`,
       `业务痛点：${payload.painPoint}`
     ].join("\n");
   }

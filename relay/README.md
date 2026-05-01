@@ -71,7 +71,7 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 
 飞书字段名按 `dev-brief.md` 表 C / 表 D：
 
-- 企业需求：`company`、`contact_name`、`industry`、`pain_point`、`budget_range`、`expected_delivery`、`need_recommend`、`phone`、`wechat`、`created_at`
+- 企业需求：`company`、`contact_name`、`industry`、`pain_point`、`budget_range`、`expected_delivery`、`need_recommend`、`phone`、`wechat`、`context`、`created_at`
 - 入驻申请：`team_name`、`direction`、`case_links`、`tech_stack`、`budget_range`、`can_invoice`、`contact_phone`、`contact_wechat`、`created_at`
 
 如果飞书表字段使用中文列名，需要在 `relay/lead-relay.mjs` 的 `toFeishuFields()` 中调整映射。
