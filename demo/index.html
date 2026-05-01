@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>九章甄选 — AI 商业服务的严选平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&display=swap');
+    
+    * { font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif; }
+    .font-serif { font-family: 'Noto Serif SC', serif; }
+    
+    body { background: #FAFAF9; color: #1C1917; }
+    
+    .editorial-card {
+      transition: all 0.3s ease;
+      border: 1px solid #E7E5E4;
+    }
+    .editorial-card:hover {
+      border-color: #D6D3D1;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+      transform: translateY(-2px);
+    }
+
+    .accent-line {
+      width: 40px;
+      height: 3px;
+      background: #C2410C;
+      border-radius: 2px;
+    }
+
+    .case-badge {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: #F5F5F4;
+      color: #78716C;
+      font-size: 10px;
+      padding: 4px 12px;
+      border-bottom-left-radius: 12px;
+      border: 1px solid #E7E5E4;
+      border-top: none;
+      border-right: none;
+    }
+
+    .level-badge-l1 { background: #F5F5F4; color: #78716C; }
+    .level-badge-l2 { background: #FEF3C7; color: #92400E; }
+    .level-badge-l3 { background: #DCFCE7; color: #166534; }
+
+    .metric-divider {
+      width: 1px;
+      height: 24px;
+      background: #D6D3D1;
+    }
+
+    .hero-pain {
+      background: linear-gradient(180deg, transparent 60%, rgba(194,65,12,0.12) 60%);
+    }
+
+    .step-number {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 56px;
+      font-weight: 900;
+      color: #F5F5F4;
+      line-height: 1;
+      -webkit-text-stroke: 2px #D6D3D1;
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <!-- ===== 导航栏 ===== -->
+  <nav class="sticky top-0 z-50 border-b" style="background: rgba(250,250,249,0.92); backdrop-filter: blur(12px); border-color: #E7E5E4;">
+    <div class="max-w-6xl mx-auto px-6 flex justify-between items-center h-16">
+      <!-- Logo -->
+      <a href="#" class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: #1C1917;">
+          <span class="text-white text-sm font-bold" style="font-family: 'Noto Serif SC', serif;">甄</span>
+        </div>
+        <span class="text-xl font-bold tracking-tight" style="font-family: 'Noto Serif SC', serif;">九章甄选</span>
+      </a>
+
+      <!-- Nav Links -->
+      <div class="hidden md:flex items-center space-x-8">
+        <a href="#" class="text-sm font-medium hover:text-amber-700 transition-colors" style="color: #57534E;">找服务商</a>
+        <a href="#" class="text-sm font-medium hover:text-amber-700 transition-colors" style="color: #57534E;">商业案例</a>
+        <a href="#" class="text-sm font-medium hover:text-amber-700 transition-colors" style="color: #57534E;">验收标准</a>
+      </div>
+
+      <!-- CTAs -->
+      <div class="flex items-center space-x-3">
+        <a href="#" class="hidden sm:block text-sm font-medium hover:text-amber-700 transition-colors" style="color: #57534E;">服务商入驻</a>
+        <a href="#" class="text-sm font-medium px-5 py-2.5 rounded-lg text-white transition-all hover:opacity-90" style="background: #C2410C;">
+          发布企业需求
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== Hero ===== -->
+  <section class="max-w-4xl mx-auto px-6 pt-24 pb-16 md:pt-32 md:pb-20 text-center">
+    <!-- 标签 -->
+    <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full mb-8" style="background: #FEF3C7; color: #92400E; font-size: 13px;">
+      <span class="w-1.5 h-1.5 rounded-full" style="background: #C2410C;"></span>
+      <span class="font-medium">AI 商业服务的严选平台</span>
+    </div>
+
+    <!-- 主标题 -->
+    <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 tracking-tight">
+      想用 AI 做业务，但<span class="hero-pain">不知道该找谁、花多少钱、怎么验收？</span>
+    </h1>
+
+    <!-- 副标题 -->
+    <p class="text-lg md:text-xl leading-relaxed mb-10 max-w-2xl mx-auto" style="color: #57534E;">
+      九章甄选 — 只推荐经过<span class="font-semibold" style="color: #1C1917;">真实商业验证</span>的 AI 创作者与独立工作室。
+      每一笔交付都有<span class="font-semibold" style="color: #1C1917;">资金担保</span>与<span class="font-semibold" style="color: #1C1917;">标准验收</span>。
+    </p>
+
+    <!-- 双 CTA -->
+    <div class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+      <a href="#" class="inline-flex items-center justify-center px-8 py-4 rounded-xl text-white font-semibold text-base transition-all hover:opacity-90 shadow-lg" style="background: #C2410C; box-shadow: 0 4px 14px rgba(194,65,12,0.25);">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        免费发布 AI 需求诊断
+      </a>
+      <a href="#" class="inline-flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-base transition-all hover:border-amber-200" style="border: 1.5px solid #D6D3D1; color: #44403C;">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+        申请成为精选服务商
+      </a>
+    </div>
+
+    <!-- 轻量信任条 -->
+    <div class="flex flex-wrap items-center justify-center space-x-4 sm:space-x-8 mt-12" style="color: #78716C; font-size: 13px;">
+      <span>✓ 已交付 <strong style="color: #1C1917;">27</strong> 个商业项目</span>
+      <span class="metric-divider hidden sm:block"></span>
+      <span>✓ 企业选型耗时 <strong style="color: #1C1917;">-60%</strong></span>
+      <span class="metric-divider hidden sm:block"></span>
+      <span>✓ 资金纠纷 <strong style="color: #1C1917;">0 起</strong></span>
+    </div>
+  </section>
+
+  <!-- ===== 三步流程 ===== -->
+  <section class="max-w-5xl mx-auto px-6 py-16 md:py-20">
+    <div class="text-center mb-14">
+      <div class="accent-line mx-auto mb-4"></div>
+      <h2 class="text-2xl md:text-3xl font-bold mb-3">从需求到交付，只需三步</h2>
+      <p style="color: #78716C;">不需要自己满天找服务商，平台帮你完成筛选、诊断与担保</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+      <!-- Step 1 -->
+      <div class="text-center relative">
+        <div class="step-number mx-auto mb-4" style="width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">01</div>
+        <h3 class="text-lg font-bold mb-2">发布需求</h3>
+        <p class="text-sm leading-relaxed" style="color: #57534E;">用 2 分钟填写业务痛点与预算，平台专属产品经理对接</p>
+      </div>
+      <!-- Arrow -->
+      <div class="hidden md:flex items-center justify-center absolute left-1/3 transform -translate-x-1/2" style="display:none;"></div>
+
+      <!-- Step 2 -->
+      <div class="text-center">
+        <div class="step-number mx-auto mb-4" style="width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">02</div>
+        <h3 class="text-lg font-bold mb-2">诊断匹配</h3>
+        <p class="text-sm leading-relaxed" style="color: #57534E;">将模糊想法翻译成技术方案，匹配 2-3 家最合适且验证过的服务商</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="text-center">
+        <div class="step-number mx-auto mb-4" style="width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">03</div>
+        <h3 class="text-lg font-bold mb-2">担保交付</h3>
+        <p class="text-sm leading-relaxed" style="color: #57534E;">按里程碑释放资金，平台提供标准验收模板与 SLA 兜底</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 精选服务商（去 Tab，直接展示） ===== -->
+  <section class="max-w-6xl mx-auto px-6 py-16 md:py-20" style="border-top: 1px solid #E7E5E4;">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-10">
+      <div>
+        <div class="accent-line mb-4"></div>
+        <h2 class="text-2xl md:text-3xl font-bold mb-2">精选 AI 服务商</h2>
+        <p style="color: #78716C;">每一个都经过平台商业交付验证</p>
+      </div>
+      <a href="#" class="text-sm font-medium mt-4 md:mt-0 flex items-center hover:opacity-70 transition-opacity" style="color: #C2410C;">
+        查看全部服务商
+        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+      </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Card 1 -->
+      <div class="editorial-card bg-white rounded-2xl overflow-hidden">
+        <div class="p-6">
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="text-lg font-bold">星火 AI 自动化</h3>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-full level-badge-l2">Level 2 · 商业验证</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">企业知识库</span>
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">客服 Agent</span>
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">自动化流程</span>
+          </div>
+          <div class="space-y-2.5 text-sm" style="color: #57534E;">
+            <div class="flex justify-between"><span>擅长行业</span><span class="font-medium" style="color: #44403C;">教育 / 电商 / 咨询</span></div>
+            <div class="flex justify-between"><span>交付周期</span><span class="font-medium" style="color: #44403C;">7 - 21 天</span></div>
+            <div class="flex justify-between"><span>预算区间</span><span class="font-semibold ml-auto" style="color: #C2410C;">¥8,000 - 50,000</span></div>
+          </div>
+        </div>
+        <div class="px-6 py-4 flex justify-between items-center" style="background: #FAFAF9; border-top: 1px solid #F0EFED;">
+          <div class="flex items-center text-sm">
+            <span style="color: #C2410C;">★</span>
+            <span class="font-bold ml-1">4.9</span>
+            <span class="ml-1" style="color: #A8A29E;">· 12 个交付案例</span>
+          </div>
+          <a href="#" class="text-sm font-medium flex items-center hover:opacity-70 transition-opacity" style="color: #C2410C;">
+            详情 <span class="ml-1">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="editorial-card bg-white rounded-2xl overflow-hidden">
+        <div class="p-6">
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="text-lg font-bold">视界线视觉</h3>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-full level-badge-l3">Level 3 · 企业合伙人</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">商品图自动化</span>
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">短视频工作流</span>
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">数字人</span>
+          </div>
+          <div class="space-y-2.5 text-sm" style="color: #57534E;">
+            <div class="flex justify-between"><span>擅长行业</span><span class="font-medium" style="color: #44403C;">跨境电商 / MCN</span></div>
+            <div class="flex justify-between"><span>交付周期</span><span class="font-medium" style="color: #44403C;">3 - 10 天</span></div>
+            <div class="flex justify-between"><span>预算区间</span><span class="font-semibold ml-auto" style="color: #C2410C;">¥5,000 - 20,000</span></div>
+          </div>
+        </div>
+        <div class="px-6 py-4 flex justify-between items-center" style="background: #FAFAF9; border-top: 1px solid #F0EFED;">
+          <div class="flex items-center text-sm">
+            <span style="color: #C2410C;">★</span>
+            <span class="font-bold ml-1">5.0</span>
+            <span class="ml-1" style="color: #A8A29E;">· 34 个交付案例</span>
+          </div>
+          <a href="#" class="text-sm font-medium flex items-center hover:opacity-70 transition-opacity" style="color: #C2410C;">
+            详情 <span class="ml-1">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="editorial-card bg-white rounded-2xl overflow-hidden">
+        <div class="p-6">
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="text-lg font-bold">CodeNode 实验室</h3>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-full level-badge-l1">Level 1 · 平台初筛</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">私有数据微调</span>
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">RAG 架构</span>
+            <span class="text-xs px-2 py-1 rounded" style="background: #F5F5F4; color: #57534E;">办公提效</span>
+          </div>
+          <div class="space-y-2.5 text-sm" style="color: #57534E;">
+            <div class="flex justify-between"><span>擅长行业</span><span class="font-medium" style="color: #44403C;">制造 / 法律 / 财税</span></div>
+            <div class="flex justify-between"><span>交付周期</span><span class="font-medium" style="color: #44403C;">15 - 30 天</span></div>
+            <div class="flex justify-between"><span>预算区间</span><span class="font-semibold ml-auto" style="color: #C2410C;">¥20,000 - 80,000</span></div>
+          </div>
+        </div>
+        <div class="px-6 py-4 flex justify-between items-center" style="background: #FAFAF9; border-top: 1px solid #F0EFED;">
+          <div class="flex items-center text-sm">
+            <span style="color: #C2410C;">★</span>
+            <span class="font-bold ml-1">4.8</span>
+            <span class="ml-1" style="color: #A8A29E;">· 3 个交付案例</span>
+          </div>
+          <a href="#" class="text-sm font-medium flex items-center hover:opacity-70 transition-opacity" style="color: #C2410C;">
+            详情 <span class="ml-1">→</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 案例拆解（编辑精选叙事风格） ===== -->
+  <section class="py-16 md:py-20" style="background: #1C1917;">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center mb-14">
+        <div class="accent-line mx-auto mb-4" style="background: #C2410C;"></div>
+        <h2 class="text-2xl md:text-3xl font-bold mb-3" style="color: #F5F5F4;">商业案例深度拆解</h2>
+        <p style="color: #A8A29E;">不是作品秀，是真实的商业交付复盘</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Case 1 -->
+        <div class="rounded-2xl overflow-hidden relative" style="background: #292524;">
+          <div class="case-badge" style="background: #44403C; color: #A8A29E; border-color: #57534E;">含 AI 生成内容标识</div>
+          <div class="p-8">
+            <span class="text-xs font-bold tracking-widest uppercase mb-3 block" style="color: #C2410C;">Case Study · 电商视觉</span>
+            <h3 class="text-xl font-bold mb-6 leading-snug" style="color: #F5F5F4;">某跨境电商品牌：AI 商品图全自动化工作流搭建</h3>
+            
+            <div class="space-y-4 mb-6">
+              <div class="p-4 rounded-xl" style="background: #3B2E2B;">
+                <p class="text-xs font-bold mb-1" style="color: #FCA5A5;">▎ 企业痛点</p>
+                <p class="text-sm leading-relaxed" style="color: #D6D3D1;">传统外拍成本高、周期长（约15天/批），难以应对快速上新的需求。</p>
+              </div>
+              <div class="p-4 rounded-xl" style="background: #1E3A2F;">
+                <p class="text-xs font-bold mb-1" style="color: #6EE7B7;">▎ 方案</p>
+                <p class="text-sm leading-relaxed" style="color: #D6D3D1;">基于 ComfyUI 搭建专属风格模型工作流，白底图自动生成场景图 + 多尺寸适配。</p>
+              </div>
+            </div>
+
+            <div class="pt-6 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4" style="border-top: 1px solid #44403C;">
+              <div>
+                <p style="color: #A8A29E; font-size: 12px; margin-bottom: 4px;">可量化效果</p>
+                <p class="text-lg font-bold" style="color: #C2410C;">单张成本 ↓85% · 交付周期 1 天</p>
+              </div>
+              <div class="text-right">
+                <p style="color: #A8A29E; font-size: 12px; margin-bottom: 4px;">实施预算</p>
+                <p class="text-lg font-semibold" style="color: #F5F5F4;">约 ¥15,000</p>
+              </div>
+            </div>
+          </div>
+          <div class="px-8 py-4 flex justify-between items-center" style="background: #1F1C1A; border-top: 1px solid #292524;">
+            <span style="color: #A8A29E; font-size: 13px;">服务商：<span style="color: #D6D3D1; font-weight: 500;">视界线视觉</span></span>
+            <a href="#" class="text-sm font-medium flex items-center hover:opacity-70 transition-opacity" style="color: #C2410C;">
+              索取方案报价 <span class="ml-1">→</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Case 2 -->
+        <div class="rounded-2xl overflow-hidden relative" style="background: #292524;">
+          <div class="case-badge" style="background: #44403C; color: #A8A29E; border-color: #57534E;">含 AI 生成内容标识</div>
+          <div class="p-8">
+            <span class="text-xs font-bold tracking-widest uppercase mb-3 block" style="color: #C2410C;">Case Study · 企业 AI</span>
+            <h3 class="text-xl font-bold mb-6 leading-snug" style="color: #F5F5F4;">B2B 咨询公司：私有数据 RAG 问答系统搭建</h3>
+            
+            <div class="space-y-4 mb-6">
+              <div class="p-4 rounded-xl" style="background: #3B2E2B;">
+                <p class="text-xs font-bold mb-1" style="color: #FCA5A5;">▎ 企业痛点</p>
+                <p class="text-sm leading-relaxed" style="color: #D6D3D1;">新人培训成本高，沉淀上万份行业报告但检索困难，知识利用率极低。</p>
+              </div>
+              <div class="p-4 rounded-xl" style="background: #1E3A2F;">
+                <p class="text-xs font-bold mb-1" style="color: #6EE7B7;">▎ 方案</p>
+                <p class="text-sm leading-relaxed" style="color: #D6D3D1;">大语言模型 + 向量数据库（RAG），接入企业微信，支持文档级溯源问答。</p>
+              </div>
+            </div>
+
+            <div class="pt-6 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4" style="border-top: 1px solid #44403C;">
+              <div>
+                <p style="color: #A8A29E; font-size: 12px; margin-bottom: 4px;">可量化效果</p>
+                <p class="text-lg font-bold" style="color: #C2410C;">检索效率 ↑300% · 培训周期 ↓1/3</p>
+              </div>
+              <div class="text-right">
+                <p style="color: #A8A29E; font-size: 12px; margin-bottom: 4px;">实施预算</p>
+                <p class="text-lg font-semibold" style="color: #F5F5F4;">约 ¥35,000</p>
+              </div>
+            </div>
+          </div>
+          <div class="px-8 py-4 flex justify-between items-center" style="background: #1F1C1A; border-top: 1px solid #292524;">
+            <span style="color: #A8A29E; font-size: 13px;">服务商：<span style="color: #D6D3D1; font-weight: 500;">星火 AI 自动化</span></span>
+            <a href="#" class="text-sm font-medium flex items-center hover:opacity-70 transition-opacity" style="color: #C2410C;">
+              索取方案报价 <span class="ml-1">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 案例底部提示 -->
+      <div class="text-center mt-10">
+        <p class="text-sm mb-4" style="color: #78716C;">以上案例均来自平台真实交付项目，数据经企业方授权脱敏后公开</p>
+        <a href="#" class="inline-flex items-center text-sm font-medium hover:opacity-70 transition-opacity" style="color: #C2410C;">
+          查看全部案例 <span class="ml-1">→</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 信任基础设施（不是功能列表，是保障承诺） ===== -->
+  <section class="max-w-6xl mx-auto px-6 py-16 md:py-20">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- Trust 1 -->
+      <div class="editorial-card bg-white rounded-2xl p-8">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-5" style="background: #FEF3C7;">
+          <svg class="w-5 h-5" style="color: #C2410C;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <h3 class="font-bold text-lg mb-3">资金节点托管</h3>
+        <p class="text-sm leading-relaxed" style="color: #57534E;">项目款项按「需求确认 → Demo 验收 → 系统上线 → 最终交付」四个节点分批释放。双向保障，0 起资金纠纷。</p>
+      </div>
+
+      <!-- Trust 2 -->
+      <div class="editorial-card bg-white rounded-2xl p-8">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-5" style="background: #FEF3C7;">
+          <svg class="w-5 h-5" style="color: #C2410C;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+        </div>
+        <h3 class="font-bold text-lg mb-3">标准验收协议 (SLA)</h3>
+        <p class="text-sm leading-relaxed" style="color: #57534E;">平台制定《AI 项目验收白皮书》，明确容错率、响应时间、交付边界。从合同源头拒绝无休止返工。</p>
+      </div>
+
+      <!-- Trust 3 -->
+      <div class="editorial-card bg-white rounded-2xl p-8">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-5" style="background: #FEF3C7;">
+          <svg class="w-5 h-5" style="color: #C2410C;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+          </svg>
+        </div>
+        <h3 class="font-bold text-lg mb-3">三级认证体系</h3>
+        <p class="text-sm leading-relaxed" style="color: #57534E;">平台初筛 → 商业验证 → 企业合伙人。每一级升级都基于真实交付数据与客户评价，拒绝刷分和自嗨。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 双端入口 ===== -->
+  <section class="py-16 md:py-20" style="background: #F5F5F4;">
+    <div class="max-w-5xl mx-auto px-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 企业端 -->
+        <div class="editorial-card bg-white rounded-2xl p-8 md:p-10">
+          <p class="text-sm font-medium mb-2" style="color: #C2410C;">面向企业 / 品牌方 / 中小商家</p>
+          <h3 class="text-2xl font-bold mb-3">我需要 AI 解决方案</h3>
+          <p class="text-sm leading-relaxed mb-6" style="color: #57534E;">告诉我们你的业务痛点与预算，平台帮你筛选匹配 2-3 家经过商业验证的服务商，并提供标准验收模板与资金担保。</p>
+          <ul class="space-y-2 mb-8">
+            <li class="flex items-start text-sm" style="color: #57534E;">
+              <span class="mr-2 mt-0.5" style="color: #C2410C;">✓</span> 免费需求诊断，2 分钟提交
+            </li>
+            <li class="flex items-start text-sm" style="color: #57534E;">
+              <span class="mr-2 mt-0.5" style="color: #C2410C;">✓</span> 平台担保交付，按里程碑付款
+            </li>
+            <li class="flex items-start text-sm" style="color: #57534E;">
+              <span class="mr-2 mt-0.5" style="color: #C2410C;">✓</span> 专属产品经理全程跟进
+            </li>
+          </ul>
+          <a href="#" class="inline-flex items-center justify-center w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90" style="background: #C2410C;">
+            免费发布需求
+          </a>
+        </div>
+
+        <!-- 创作者端 -->
+        <div class="editorial-card bg-white rounded-2xl p-8 md:p-10">
+          <p class="text-sm font-medium mb-2" style="color: #C2410C;">面向 AI 创作者 / 工作室 / OPC</p>
+          <h3 class="text-2xl font-bold mb-3">我是 AI 服务商</h3>
+          <p class="text-sm leading-relaxed mb-6" style="color: #57534E;">你的 AI 产品很棒，但缺曝光、缺客户、缺品牌背书？加入九章甄选，平台帮你做商业包装，对接真实企业需求。</p>
+          <ul class="space-y-2 mb-8">
+            <li class="flex items-start text-sm" style="color: #57534E;">
+              <span class="mr-2 mt-0.5" style="color: #C2410C;">✓</span> 平台背书 + 分级认证
+            </li>
+            <li class="flex items-start text-sm" style="color: #57534E;">
+              <span class="mr-2 mt-0.5" style="color: #C2410C;">✓</span> 案例包装 + 商业方案撰写支持
+            </li>
+            <li class="flex items-start text-sm" style="color: #57534E;">
+              <span class="mr-2 mt-0.5" style="color: #C2410C;">✓</span> 企业级项目直接对接
+            </li>
+          </ul>
+          <a href="#" class="inline-flex items-center justify-center w-full py-3.5 rounded-xl font-semibold text-sm transition-all hover:bg-gray-50" style="border: 1.5px solid #D6D3D1; color: #44403C;">
+            申请成为精选服务商
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 底部 CTA ===== -->
+  <section class="max-w-3xl mx-auto px-6 py-20 text-center">
+    <div class="accent-line mx-auto mb-6"></div>
+    <h2 class="text-2xl md:text-3xl font-bold mb-4">还不知道该找谁？不知道预算怎么定？</h2>
+    <p class="text-lg leading-relaxed mb-8" style="color: #57534E;">
+      把你的业务痛点告诉我们。平台专属产品经理帮你拆解需求、预估报价，<br class="hidden sm:block">并匹配 2-3 家最合适的验证服务商。
+    </p>
+    <a href="#" class="inline-flex items-center justify-center px-10 py-4 rounded-xl text-white font-bold text-lg transition-all hover:opacity-90 shadow-lg" style="background: #C2410C; box-shadow: 0 4px 20px rgba(194,65,12,0.3);">
+      开始免费需求诊断（约 2 分钟）
+    </a>
+    <p class="mt-5 text-sm flex items-center justify-center" style="color: #78716C;">
+      <svg class="w-4 h-4 mr-1.5" style="color: #15803D;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      业务数据严格保密 · 签署标准 NDA
+    </p>
+  </section>
+
+  <!-- ===== Footer ===== -->
+  <footer class="border-t py-12" style="border-color: #E7E5E4;">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="flex items-center space-x-2.5 mb-6 md:mb-0">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background: #1C1917;">
+            <span class="text-white text-xs font-bold" style="font-family: 'Noto Serif SC', serif;">甄</span>
+          </div>
+          <span class="font-bold" style="font-family: 'Noto Serif SC', serif;">九章甄选</span>
+          <span class="text-sm" style="color: #A8A29E;">© 2026</span>
+        </div>
+        <div class="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm" style="color: #78716C;">
+          <a href="#" class="hover:text-amber-700 transition-colors">关于我们</a>
+          <a href="#" class="hover:text-amber-700 transition-colors">服务商入驻协议</a>
+          <a href="#" class="hover:text-amber-700 transition-colors">隐私与数据合规</a>
+          <a href="#" class="hover:text-amber-700 transition-colors">验收白皮书下载</a>
+        </div>
+      </div>
+      <p class="text-xs text-center mt-8" style="color: #A8A29E;">
+        本站所含 AI 生成内容均已按《人工智能生成合成内容标识办法》要求标注 · 探索可靠的 AI 商业交付
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>
