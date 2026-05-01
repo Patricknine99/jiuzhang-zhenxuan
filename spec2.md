@@ -114,3 +114,30 @@
   2. 使用 Git 提交保存一个可回滚点。
   3. 提交信息使用清晰中文或英文，说明本次主要变更。
 - **本次动作**：准备初始化 Git 仓库，新增 `.gitignore` 排除依赖、构建产物、本地环境和工作区元数据，然后提交当前稳定性批次。
+
+## 7. ChatGPT 验证记录（2026-05-01 路由与响应批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **验证范围**：
+  1. Git 状态、分支和最近提交。
+  2. `npm run relay:check`、`npm run lint`、`npm run build`。
+  3. 本地 Next dev 服务下的核心页面 HTTP 响应。
+  4. relay dry-run 下的健康检查、正常提交、鉴权错误、Content-Type 错误。
+- **发现的问题**：
+  1. `.next/dev/lock` 残留导致 `npm run dev` 误判已有服务；确认 PID 不存在后清理缓存 lock 并重新启动。
+  2. 在 `output: "export"` 下访问不存在的 `/providers/:slug`、`/cases/:slug` 虽然返回 404，但 Next dev 日志会记录动态参数错误。
+- **ChatGPT 修改**：
+  1. 在 `app/providers/[slug]/page.tsx` 增加 `export const dynamicParams = false`。
+  2. 在 `app/cases/[slug]/page.tsx` 增加 `export const dynamicParams = false`。
+- **原因**：明确动态详情页只允许 `generateStaticParams()` 生成的 slug，未知 slug 直接静态 404，避免开发日志出现误导性的动态参数错误。
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run lint` 通过。
+  3. `npm run build` 通过，静态生成 20 个页面。
+  4. 本地 Next dev 核心路由响应正常：`/`、`/providers`、`/providers/spark-ai-automation`、`/cases`、`/cases/b2b-consulting-rag-system`、`/post-demand`、`/join`、`/sla`、`/terms`、`/privacy`、`/provider-agreement` 均返回 200。
+  5. 未知动态路由 `/providers/bad-slug` 与 `/cases/bad-slug` 最终均返回 404。说明：Next dev 在 `output: "export"` 模式下访问未导出的动态路径时仍可能记录一条静态参数诊断，但生产静态构建不受影响。
+  6. relay dry-run 验证通过：`GET /healthz` 返回健康状态；`POST /api/leads` 正常需求 payload 返回 `ok: true`；错误密钥返回 401；错误 Content-Type 返回 415。
+  7. 数据一致性脚本通过：4 个服务商、3 个案例，slug 无重复，案例引用的服务商均存在。
+  8. 表单页面检查通过：`/post-demand`、`/join` 均包含字段、提交按钮和安全中转说明。
+  9. 页面 HTML 中未发现真实运行时错误；`error` 字符串命中来自 Next dev 自动注入的 global-error 脚本与样式。
