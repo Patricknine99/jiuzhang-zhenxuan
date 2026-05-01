@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, MessageCircle, Phone, UserRound } from "lucide-react";
 import { authStorageKey, createLocalAccount, isValidEmail, isValidPhone, type LocalAccount } from "@/lib/auth";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 type AuthMode = "login" | "register";
 type Method = "email" | "phone";
@@ -17,6 +18,8 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
 
   const isRegister = mode === "register";
 
@@ -65,8 +68,9 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
 
       <form
         className="mt-6 space-y-4"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
+          if (isSubmitting) return;
           setError("");
           setMessage("");
           const normalized = validateIdentifier(method, identifier);
@@ -82,9 +86,12 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
             setError("请输入至少 6 位密码。当前为前端预留登录流程。");
             return;
           }
+          setIsSubmitting(true);
+          await delay(420);
           const account = createLocalAccount(method, normalized.value, isRegister ? role : "buyer");
           window.localStorage.setItem(authStorageKey, JSON.stringify(account));
           setMessage(isRegister ? "注册成功，正在进入账号页。" : "登录成功，正在进入账号页。");
+          setIsSubmitting(false);
           window.setTimeout(() => router.push("/account"), 350);
         }}
       >
@@ -106,24 +113,37 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-stone-700">短信验证码</span>
             <div className="grid grid-cols-[1fr_auto] gap-2">
-              <input className="field" value={code} onChange={(event) => setCode(event.target.value)} placeholder="任意 6 位数字" inputMode="numeric" required />
-              <button type="button" className="rounded-xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50" onClick={() => setMessage("验证码接口已预留：后续接入短信服务商后会真实发送。")}>
-                获取验证码
+              <input className="field" value={code} onChange={(event) => setCode(event.target.value)} placeholder="任意 6 位数字" inputMode="numeric" required disabled={isSubmitting} />
+              <button
+                type="button"
+                disabled={isSendingCode}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={async () => {
+                  setIsSendingCode(true);
+                  setMessage("");
+                  await delay(500);
+                  setMessage("验证码接口已预留：后续接入短信服务商后会真实发送。当前可使用任意 6 位数字。");
+                  setIsSendingCode(false);
+                }}
+              >
+                {isSendingCode ? <LoadingSpinner /> : null}
+                {isSendingCode ? "发送中" : "获取验证码"}
               </button>
             </div>
           </label>
         ) : (
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-stone-700">密码</span>
-            <input className="field" value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="至少 6 位" required />
+            <input className="field" value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="至少 6 位" required disabled={isSubmitting} />
           </label>
         )}
 
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
         {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
 
-        <button type="submit" className="w-full rounded-xl bg-[var(--color-brand)] px-5 py-3.5 font-semibold text-white hover:bg-[var(--color-brand-hover)]">
-          {isRegister ? "创建账号" : "登录"}
+        <button type="submit" disabled={isSubmitting} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-5 py-3.5 font-semibold text-white hover:bg-[var(--color-brand-hover)] disabled:cursor-not-allowed disabled:opacity-60">
+          {isSubmitting ? <LoadingSpinner /> : null}
+          {isSubmitting ? "处理中，请稍候" : isRegister ? "创建账号" : "登录"}
         </button>
       </form>
 
@@ -137,6 +157,10 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       </div>
     </div>
   );
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function ReservedAuthButton({ label, icon }: { label: string; icon: React.ReactNode }) {

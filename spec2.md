@@ -198,3 +198,38 @@
   4. `npm run build` 通过，静态生成 35 个页面。
   5. `npm run smoke:routes` 通过，新增 `/diagnosis`、`/login`、`/register`、`/account` 均返回 200。
   6. 未知动态路由 `/providers/bad-slug`、`/cases/bad-slug`、`/services/bad-slug`、`/industries/bad-slug` 均返回 404。
+
+## 10. ChatGPT 灰度测试记录（2026-05-02 慢网与等待态批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **测试目标**：检查灰度环境下是否存在构建、路由、relay、数据一致性问题，并补齐网络拥挤时的等待反馈。
+- **初始灰度结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run verify:data` 通过。
+  3. `npm run lint` 通过。
+  4. `npm run build` 通过，静态生成 35 个页面。
+- **发现的问题/体验缺口**：
+  1. 页面切换缺少全局 `loading` 等待页。
+  2. 表单提交只有文字变化，没有旋转等待反馈。
+  3. AI 诊断接口没有超时控制，慢网时用户反馈不足。
+  4. 智能客服发送消息没有“AI 正在回复”的等待态。
+  5. 登录/注册和获取验证码缺少处理中状态。
+- **ChatGPT 修改**：
+  1. 新增 `app/loading.tsx`，提供全局页面加载等待页。
+  2. 新增 `components/shared/LoadingSpinner.tsx`，统一旋转加载图标。
+  3. 更新 `components/shared/StaticForm.tsx`，提交按钮增加旋转状态，并确保 fetch 超时定时器在请求结束后清理。
+  4. 更新 `components/diagnosis/DiagnosisWorkspace.tsx`，AI 诊断增加慢网等待骨架、按钮禁用、接口超时和本地兜底延迟反馈。
+  5. 更新 `components/support/FloatingSupport.tsx`，客服发送增加“AI 正在回复”、接口超时和本地兜底。
+  6. 更新 `components/auth/AuthPanel.tsx`，登录/注册、获取验证码增加处理中状态。
+  7. 更新 `.env.example`，新增 `NEXT_PUBLIC_DIAGNOSIS_TIMEOUT_MS`、`NEXT_PUBLIC_SUPPORT_TIMEOUT_MS`。
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run verify:data` 通过。
+  3. `npm run lint` 通过。
+  4. `npm run build` 通过，静态生成 35 个页面。
+  5. `npm run smoke:routes` 通过，核心页面返回 200，未知动态路由返回 404。
+  6. relay dry-run 验证通过：`GET /healthz` 返回健康状态；正常需求提交返回 `ok: true`；错误密钥返回 401。
+- **已知说明**：
+  1. Next dev 在 `output: "export"` 下故意访问未导出的动态路径时，会在控制台打印静态参数诊断；HTTP 返回 404 且生产构建通过，不影响上线静态产物。
+  2. 当前慢网等待态覆盖页面切换、线索表单、AI 诊断、智能客服、登录注册和验证码流程。

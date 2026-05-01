@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integrations";
 
 type RelayResponse = {
@@ -52,8 +53,7 @@ export function StaticForm({
               headers: buildRelayHeaders(),
               body: JSON.stringify(payload),
               signal: controller.signal
-            });
-            window.clearTimeout(timeout);
+            }).finally(() => window.clearTimeout(timeout));
             const body = (await response.json().catch(() => null)) as RelayResponse | null;
             const nextRequestId = body?.requestId || response.headers.get("X-Request-Id") || "";
             if (nextRequestId) setRequestId(nextRequestId);
@@ -89,9 +89,16 @@ export function StaticForm({
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-xl bg-[var(--color-brand)] px-5 py-3.5 font-semibold text-white hover:bg-[var(--color-brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-5 py-3.5 font-semibold text-white hover:bg-[var(--color-brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isSubmitting ? "提交中..." : "提交"}
+        {isSubmitting ? (
+          <>
+            <LoadingSpinner />
+            提交中，请稍候
+          </>
+        ) : (
+          "提交"
+        )}
       </button>
     </form>
   );
