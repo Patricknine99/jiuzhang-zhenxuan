@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, MessageCircle, Phone, UserRound } from "lucide-react";
 import { HumanVerificationField } from "@/components/shared/HumanVerificationField";
-import { authStorageKey, createLocalAccount, getOrCreateAuthDeviceId, isValidEmail, isValidPhone, type LocalAccount } from "@/lib/auth";
+import { authStorageKey, createLocalAccount, getOrCreateAuthDeviceId, isValidEmail, isValidPhone, validatePassword, type LocalAccount } from "@/lib/auth";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 type AuthMode = "login" | "register";
@@ -58,6 +58,10 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         ))}
       </div>
 
+      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+        <strong>开发阶段说明：</strong>当前账号数据暂存于浏览器本地，后续将接入服务端认证系统。请勿在此系统使用与其他平台相同的密码。
+      </div>
+
       {isRegister ? (
         <div className="mt-5 grid grid-cols-2 gap-2">
           {[
@@ -92,8 +96,14 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
             setError(normalized.message);
             return;
           }
-          if (password.length < 8) {
-            setError("请输入至少 8 位密码。");
+          if (isRegister) {
+            const pwdCheck = validatePassword(password);
+            if (!pwdCheck.valid) {
+              setError(pwdCheck.message || "密码格式不正确");
+              return;
+            }
+          } else if (password.length < 1) {
+            setError("请输入密码。");
             return;
           }
           if (needsVerification && !/^\d{6}$/.test(code.trim())) {

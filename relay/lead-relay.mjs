@@ -1,6 +1,9 @@
-import { createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
+import { promisify } from "node:util";
 import { saveLeadPlaceholder } from "./database.mjs";
+
+const scryptAsync = promisify(scrypt);
 
 const PORT = Number(process.env.PORT || process.env.LEAD_RELAY_PORT || 8787);
 const MAX_BODY_BYTES = 64 * 1024;
@@ -23,6 +26,8 @@ const DRY_RUN = process.env.LEAD_RELAY_DRY_RUN === "true";
 const RATE_LIMIT_BUCKETS = new Map();
 const AUTH_CODE_BUCKETS = new Map();
 const AUTH_ACCOUNTS = new Map();
+const SEND_CODE_COOLDOWN = new Map();
+const SEND_CODE_COOLDOWN_MS = 60_000; // 1 minute per identifier
 
 const ADMIN_ROLE_PERMISSIONS = {
   owner: ["leads:read", "leads:assign", "providers:review", "content:edit", "payments:review", "settings:manage", "audit:read"],
@@ -32,10 +37,18 @@ const ADMIN_ROLE_PERMISSIONS = {
   auditor: ["leads:read", "audit:read"]
 };
 
+// Startup security checks
+if (!SHARED_SECRET || SHARED_SECRET.length < 16) {
+  console.error("FATAL: LEAD_RELAY_SECRET must be set and at least 16 characters.");
+  console.error("Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"");
+  process.exit(1);
+}
+
 const server = createServer(async (request, response) => {
   const origin = request.headers.origin || "";
   const requestId = getRequestId();
   setCorsHeaders(response, origin);
+  setSecurityHeaders(response);
   response.setHeader("X-Request-Id", requestId);
 
   if (request.method === "OPTIONS") {
@@ -245,7 +258,19 @@ async function handleAuthCodeRequest(request, response, origin, requestId) {
     const method = normalizeAuthMethod(body.method);
     const identifier = normalizeAuthIdentifier(method, body.identifier);
     const purpose = body.purpose === "register" ? "register" : "login";
+
+    // Per-identifier send cooldown
+    const cooldownKey = `${method}:${identifier}`;
+    const lastSent = SEND_CODE_COOLDOWN.get(cooldownKey);
+    if (lastSent && Date.now() - lastSent < SEND_CODE_COOLDOWN_MS) {
+      const retryAfter = Math.ceil((SEND_CODE_COOLDOWN_MS - (Date.now() - lastSent)) / 1000);
+      response.setHeader("Retry-After", String(retryAfter));
+      sendError(response, 429, "send_cooldown", `验证码发送过于频繁，请 ${retryAfter} 秒后再试`, requestId);
+      return;
+    }
+
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    SEND_CODE_COOLDOWN.set(cooldownKey, Date.now());
     AUTH_CODE_BUCKETS.set(getAuthCodeKey(method, identifier, purpose), {
       codeHash: signValue(code),
       expiresAt: Date.now() + AUTH_CODE_TTL_MS,
@@ -294,7 +319,7 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
     if (purpose === "register") {
       if (existingAccount) throw new Error("该账号已注册，请直接登录");
       verifyAuthCode(method, identifier, purpose, body.code);
-      const account = createAuthAccount({ method, identifier, role, password, deviceId });
+      const account = await createAuthAccount({ method, identifier, role, password, deviceId });
       AUTH_ACCOUNTS.set(accountKey, account);
       sendJson(response, 200, {
         ok: true,
@@ -306,7 +331,7 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
     }
 
     if (!existingAccount) throw new Error(DRY_RUN ? "账号不存在。dry-run 模式请先注册一次。" : "账号或密码不正确");
-    if (!verifyPassword(password, existingAccount.passwordHash)) throw new Error("账号或密码不正确");
+    if (!(await verifyPassword(password, existingAccount.passwordHash))) throw new Error("账号或密码不正确");
 
     const isTrustedDevice = existingAccount.trustedDevices.has(deviceId);
     if (!isTrustedDevice) {
@@ -674,6 +699,13 @@ function setCorsHeaders(response, origin) {
   }
 }
 
+function setSecurityHeaders(response) {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.setHeader("X-XSS-Protection", "1; mode=block");
+}
+
 function isAllowedOrigin(origin) {
   if (ALLOWED_ORIGINS.includes("*")) return true;
   // When using explicit origin list, reject requests with missing origin header.
@@ -907,21 +939,27 @@ function verifyAuthCode(method, identifier, purpose, code) {
   AUTH_CODE_BUCKETS.delete(key);
 }
 
-function hashPassword(password) {
+async function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
+  const buf = await scryptAsync(password, salt, 64);
+  const hash = Buffer.from(buf).toString("hex");
   return `scrypt:${salt}:${hash}`;
 }
 
-function verifyPassword(password, stored) {
+async function verifyPassword(password, stored) {
   const [scheme, salt, expectedHash] = String(stored || "").split(":");
   if (scheme !== "scrypt" || !salt || !expectedHash) return false;
-  const actual = scryptSync(password, salt, 64);
-  const expected = Buffer.from(expectedHash, "hex");
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
+  try {
+    const buf = await scryptAsync(password, salt, 64);
+    const actual = Buffer.from(buf);
+    const expected = Buffer.from(expectedHash, "hex");
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
 }
 
-function createAuthAccount({ method, identifier, role, password, deviceId }) {
+async function createAuthAccount({ method, identifier, role, password, deviceId }) {
   return {
     id: `acct_${Date.now().toString(36)}_${signValue(identifier).slice(0, 8)}`,
     method,
@@ -929,7 +967,7 @@ function createAuthAccount({ method, identifier, role, password, deviceId }) {
     displayName: method === "email" ? identifier.split("@")[0] : `${identifier.slice(0, 3)}****${identifier.slice(-4)}`,
     role,
     createdAt: new Date().toISOString(),
-    passwordHash: hashPassword(password),
+    passwordHash: await hashPassword(password),
     trustedDevices: new Set([deviceId])
   };
 }
@@ -946,7 +984,7 @@ function toPublicAccount(account) {
 }
 
 function signValue(value) {
-  return createHmac("sha256", SHARED_SECRET || "jiuzhang-dev-secret").update(value).digest("hex");
+  return createHmac("sha256", SHARED_SECRET).update(value).digest("hex");
 }
 
 function hasWechatPayConfig() {

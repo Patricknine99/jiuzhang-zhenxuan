@@ -193,9 +193,16 @@ function buildRelayHeaders() {
   };
 }
 
+function sanitizeInput(input: string): string {
+  return input
+    .replace(/[<>]/g, "")
+    .trim()
+    .slice(0, 2000);
+}
+
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
-  return typeof value === "string" ? value : "";
+  return typeof value === "string" ? sanitizeInput(value) : "";
 }
 
 function getOptionalString(formData: FormData, key: string) {

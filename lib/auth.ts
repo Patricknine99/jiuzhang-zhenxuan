@@ -28,6 +28,14 @@ export function isValidPhone(value: string) {
   return /^1[3-9]\d{9}$/.test(normalizePhone(value));
 }
 
+export function validatePassword(password: string): { valid: boolean; message?: string } {
+  if (password.length < 8) return { valid: false, message: "密码至少 8 位" };
+  if (!/[A-Za-z]/.test(password)) return { valid: false, message: "密码需包含字母" };
+  if (!/\d/.test(password)) return { valid: false, message: "密码需包含数字" };
+  if (!/[^A-Za-z0-9]/.test(password)) return { valid: false, message: "密码需包含特殊字符" };
+  return { valid: true };
+}
+
 export function createLocalAccount(method: "email" | "phone", identifier: string, role: LocalAccount["role"]): LocalAccount {
   const normalized = method === "email" ? normalizeEmail(identifier) : normalizePhone(identifier);
   return {
