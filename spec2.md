@@ -378,3 +378,22 @@
 - **仍需用户本地处理**：
   1. `.env` 中的 `LEAD_RELAY_SECRET` 需要替换为 32 位以上随机字符串；本批 smoke 使用临时命令行变量覆盖，没有把真实密钥写入仓库。
   2. 云端部署前必须设置非默认 `ADMIN_BOOTSTRAP_PASSWORD`，并运行 `npm run check:env`。
+
+## 17. ChatGPT 修改记录（2026-05-02 国内云服务器部署文档审阅批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **处理原因**：用户提供 `idea1.md`，要求检查另一位助手给出的云端 Linux 部署建议，并按国内服务器运行场景做本地化调整。
+- **本批完成**：
+  1. 将文档标题和项目名统一为“九章甄选”。
+  2. 将过期的“PostgreSQL/Redis 预留、database.mjs 占位”改为当前真实状态：PostgreSQL/Redis 已接入，`relay/db.mjs`、`relay/redis.mjs` 是基础设施适配层，`relay/database.mjs` 是业务持久化层。
+  3. 调整推荐架构为“静态托管 + Relay 服务 + 托管 PostgreSQL/Redis”，强调国内云端应优先使用同 VPC 内网托管实例。
+  4. 补充国内 Linux 适配：apt 镜像源、npm 国内 registry 说明、非 root 运行用户、`.env` 权限、云安全组、SSH 密钥登录、fail2ban、备份保留。
+  5. 补充云端数据库解耦策略：`DATABASE_URL`、`REDIS_URL` 指向云端内网地址；`DB_INIT_CREATE_DATABASE=false` 为默认，云端由控制台先建库，`npm run db:init` 只负责建表和 seed。
+  6. 更新 Nginx 配置示例：加入 `client_max_body_size`，并把 `limit_req_zone` 放在引用前，避免复制配置时产生顺序误解。
+  7. 更新下一步行动清单，把“接入 PostgreSQL”改为“初始化 PostgreSQL/Redis”。
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run lint` 通过。
+  3. `npm run test` 通过，33/33 测试通过。
+  4. `npm run verify:data` 通过。
