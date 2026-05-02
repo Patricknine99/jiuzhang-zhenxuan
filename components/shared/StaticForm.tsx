@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HumanVerificationField } from "@/components/shared/HumanVerificationField";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { isValidPhone, normalizePhone } from "@/lib/auth";
 import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integrations";
 
 type RelayResponse = {
@@ -157,7 +158,7 @@ function buildLeadPayload(formData: FormData, leadType: LeadPayload["type"]): Le
       budgetRange: getString(formData, "budgetRange"),
       expectedDelivery: getString(formData, "expectedDelivery"),
       needRecommend: formData.get("needRecommend") === "on",
-      phone: getOptionalString(formData, "phone"),
+      phone: getOptionalPhone(formData, "phone"),
       wechat: getOptionalString(formData, "wechat"),
       context: getOptionalString(formData, "context"),
       source: typeof window === "undefined" ? undefined : window.location.href,
@@ -172,17 +173,20 @@ function buildLeadPayload(formData: FormData, leadType: LeadPayload["type"]): Le
   const payload = {
     type: "application",
     teamName: getString(formData, "teamName"),
-    direction: formData.getAll("direction").map(String).filter(Boolean),
+    direction: formData.getAll("direction").map((value) => sanitizeInput(String(value))).filter(Boolean),
     caseLinks: getString(formData, "caseLinks"),
     techStack: getString(formData, "techStack"),
     budgetRange: getString(formData, "budgetRange"),
     canInvoice: getString(formData, "canInvoice") === "是",
-    contactPhone: getString(formData, "contactPhone"),
+    contactPhone: getRequiredPhone(formData, "contactPhone", "请填写有效的中国大陆手机号"),
     contactWechat: getOptionalString(formData, "contactWechat"),
     captchaToken: getOptionalString(formData, "captchaToken")
   } satisfies ApplicationLead;
   if (payload.direction.length === 0) {
     throw new Error("请至少选择一个擅长方向");
+  }
+  if (countNonEmptyLines(payload.caseLinks) < 3) {
+    throw new Error("请至少填写 3 个已有案例链接或案例说明");
   }
   return payload;
 }
@@ -210,6 +214,24 @@ function getOptionalString(formData: FormData, key: string) {
   return value || undefined;
 }
 
+function getOptionalPhone(formData: FormData, key: string) {
+  const value = getOptionalString(formData, key);
+  if (!value) return undefined;
+  const normalized = normalizePhone(value);
+  if (!isValidPhone(normalized)) throw new Error("请填写有效的中国大陆手机号");
+  return normalized;
+}
+
+function getRequiredPhone(formData: FormData, key: string, message: string) {
+  const normalized = normalizePhone(getString(formData, key));
+  if (!isValidPhone(normalized)) throw new Error(message);
+  return normalized;
+}
+
+function countNonEmptyLines(value: string) {
+  return value.split(/\r?\n/).filter((line) => line.trim()).length;
+}
+
 function getSubmitTimeoutMs() {
   const value = Number(process.env.NEXT_PUBLIC_LEAD_SUBMIT_TIMEOUT_MS || 12000);
   return Number.isFinite(value) && value > 0 ? value : 12000;
@@ -229,9 +251,20 @@ function rememberSubmission(type: LeadPayload["type"], body: RelayResponse, requ
     "jiuzhang:lastLeadSubmission",
     JSON.stringify(submission)
   );
-  const raw = window.localStorage.getItem("jiuzhang:submissions");
-  const current = raw ? (JSON.parse(raw) as typeof submission[]) : [];
+  const current = readSubmissionHistory();
   window.localStorage.setItem("jiuzhang:submissions", JSON.stringify([submission, ...current].slice(0, 10)));
+}
+
+function readSubmissionHistory() {
+  const raw = window.localStorage.getItem("jiuzhang:submissions");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    window.localStorage.removeItem("jiuzhang:submissions");
+    return [];
+  }
 }
 
 function saveDraft(form: HTMLFormElement, draftKey: string) {
