@@ -1,4 +1,4 @@
-import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { saveLeadPlaceholder } from "./database.mjs";
 
@@ -20,6 +20,7 @@ const SHARED_SECRET = process.env.LEAD_RELAY_SECRET || "";
 const DRY_RUN = process.env.LEAD_RELAY_DRY_RUN === "true";
 const RATE_LIMIT_BUCKETS = new Map();
 const AUTH_CODE_BUCKETS = new Map();
+const AUTH_ACCOUNTS = new Map();
 
 const server = createServer(async (request, response) => {
   const origin = request.headers.origin || "";
@@ -58,6 +59,8 @@ const server = createServer(async (request, response) => {
       auth: {
         codeTtlMs: AUTH_CODE_TTL_MS,
         codeMaxAttempts: AUTH_CODE_MAX_ATTEMPTS,
+        passwordRequired: true,
+        newDeviceVerification: true,
         oauthReserved: ["wechat", "wecom", "feishu"]
       },
       payments: {
@@ -259,34 +262,48 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
     const identifier = normalizeAuthIdentifier(method, body.identifier);
     const purpose = body.purpose === "register" ? "register" : "login";
     const role = body.role === "provider" ? "provider" : "buyer";
-    const key = getAuthCodeKey(method, identifier, purpose);
-    const stored = AUTH_CODE_BUCKETS.get(key);
+    const password = normalizePassword(body.password);
+    const deviceId = normalizeDeviceId(body.deviceId);
+    const accountKey = getAccountKey(method, identifier);
+    const existingAccount = AUTH_ACCOUNTS.get(accountKey);
 
-    if (!stored || Date.now() > stored.expiresAt) {
-      AUTH_CODE_BUCKETS.delete(key);
-      throw new Error("验证码已过期，请重新获取");
+    if (purpose === "register") {
+      if (existingAccount) throw new Error("该账号已注册，请直接登录");
+      verifyAuthCode(method, identifier, purpose, body.code);
+      const account = createAuthAccount({ method, identifier, role, password, deviceId });
+      AUTH_ACCOUNTS.set(accountKey, account);
+      sendJson(response, 200, {
+        ok: true,
+        requestId,
+        trustedDevice: true,
+        account: toPublicAccount(account)
+      });
+      return;
     }
-    if (stored.attempts >= AUTH_CODE_MAX_ATTEMPTS) {
-      AUTH_CODE_BUCKETS.delete(key);
-      throw new Error("验证码尝试次数过多，请重新获取");
+
+    if (!existingAccount) throw new Error(DRY_RUN ? "账号不存在。dry-run 模式请先注册一次。" : "账号或密码不正确");
+    if (!verifyPassword(password, existingAccount.passwordHash)) throw new Error("账号或密码不正确");
+
+    const isTrustedDevice = existingAccount.trustedDevices.has(deviceId);
+    if (!isTrustedDevice) {
+      if (!body.code) {
+        sendJson(response, 202, {
+          ok: false,
+          requestId,
+          requiresVerification: true,
+          message: "新设备登录需要验证码"
+        });
+        return;
+      }
+      verifyAuthCode(method, identifier, purpose, body.code);
+      existingAccount.trustedDevices.add(deviceId);
     }
-    stored.attempts += 1;
-    if (!isValidSecret(signValue(String(body.code || "")), stored.codeHash)) {
-      throw new Error("验证码不正确");
-    }
-    AUTH_CODE_BUCKETS.delete(key);
 
     sendJson(response, 200, {
       ok: true,
       requestId,
-      account: {
-        id: `acct_${Date.now().toString(36)}_${signValue(identifier).slice(0, 8)}`,
-        method,
-        identifier,
-        displayName: method === "email" ? identifier.split("@")[0] : `${identifier.slice(0, 3)}****${identifier.slice(-4)}`,
-        role,
-        createdAt: new Date().toISOString()
-      }
+      trustedDevice: true,
+      account: toPublicAccount(existingAccount)
     });
   } catch (error) {
     sendError(response, 400, "bad_request", error instanceof Error ? error.message : "Invalid auth request", requestId);
@@ -731,8 +748,81 @@ function normalizeAuthIdentifier(method, value) {
   return normalized;
 }
 
+function normalizePassword(value) {
+  if (typeof value !== "string" || value.length < 8) throw new Error("密码至少需要 8 位");
+  if (value.length > 128) throw new Error("密码长度不能超过 128 位");
+  return value;
+}
+
+function normalizeDeviceId(value) {
+  if (typeof value !== "string" || !/^[a-zA-Z0-9_-]{12,80}$/.test(value)) {
+    throw new Error("设备标识缺失或格式不正确");
+  }
+  return value;
+}
+
 function getAuthCodeKey(method, identifier, purpose) {
   return `${purpose}:${method}:${identifier}`;
+}
+
+function getAccountKey(method, identifier) {
+  return `${method}:${identifier}`;
+}
+
+function verifyAuthCode(method, identifier, purpose, code) {
+  const key = getAuthCodeKey(method, identifier, purpose);
+  const stored = AUTH_CODE_BUCKETS.get(key);
+  if (!stored || Date.now() > stored.expiresAt) {
+    AUTH_CODE_BUCKETS.delete(key);
+    throw new Error("验证码已过期，请重新获取");
+  }
+  if (stored.attempts >= AUTH_CODE_MAX_ATTEMPTS) {
+    AUTH_CODE_BUCKETS.delete(key);
+    throw new Error("验证码尝试次数过多，请重新获取");
+  }
+  stored.attempts += 1;
+  if (!isValidSecret(signValue(String(code || "")), stored.codeHash)) {
+    throw new Error("验证码不正确");
+  }
+  AUTH_CODE_BUCKETS.delete(key);
+}
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  const [scheme, salt, expectedHash] = String(stored || "").split(":");
+  if (scheme !== "scrypt" || !salt || !expectedHash) return false;
+  const actual = scryptSync(password, salt, 64);
+  const expected = Buffer.from(expectedHash, "hex");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function createAuthAccount({ method, identifier, role, password, deviceId }) {
+  return {
+    id: `acct_${Date.now().toString(36)}_${signValue(identifier).slice(0, 8)}`,
+    method,
+    identifier,
+    displayName: method === "email" ? identifier.split("@")[0] : `${identifier.slice(0, 3)}****${identifier.slice(-4)}`,
+    role,
+    createdAt: new Date().toISOString(),
+    passwordHash: hashPassword(password),
+    trustedDevices: new Set([deviceId])
+  };
+}
+
+function toPublicAccount(account) {
+  return {
+    id: account.id,
+    method: account.method,
+    identifier: account.identifier,
+    displayName: account.displayName,
+    role: account.role,
+    createdAt: account.createdAt
+  };
 }
 
 function signValue(value) {

@@ -82,7 +82,8 @@ DINGTALK_AT_MOBILES=
 - 诊断 AI 接口环境变量：`NEXT_PUBLIC_DIAGNOSIS_AI_URL`
 - 悬浮客服 AI 接口环境变量：`NEXT_PUBLIC_SUPPORT_AI_URL`
 - 当前账号页：`/login`、`/register`、`/account`
-- 当前已做手机号/邮箱验证码流程。未配置 `NEXT_PUBLIC_AUTH_RELAY_URL` 时仅用于静态演示，验证码固定为 `123456`；配置后会调用 relay 的 `/api/auth/code` 与 `/api/auth/session`，由服务端校验一次性验证码。
+- 当前已做手机号/邮箱 + 密码的基础登录注册流程。注册时必须验证码；登录先校验账号密码，若是这台设备首次登录该账号，再要求短信或邮箱验证码。
+- 未配置 `NEXT_PUBLIC_AUTH_RELAY_URL` 时仅用于静态演示，验证码固定为 `123456`；配置后会调用 relay 的 `/api/auth/code` 与 `/api/auth/session`，由服务端校验一次性验证码和设备信任状态。
 - 防机器人使用 Cloudflare Turnstile 预留：前端配置 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 后显示校验组件；relay 配置 `LEAD_CAPTCHA_REQUIRED=true` 与 `TURNSTILE_SECRET_KEY` 后强制验证。
 - 微信、企业微信、飞书 OAuth 入口保留为禁用状态，等待真实开放平台应用信息后接入。
 

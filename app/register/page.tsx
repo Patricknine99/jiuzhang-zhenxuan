@@ -14,7 +14,7 @@ export default function RegisterPage() {
         <div className="accent-line mb-5" />
         <h1 className="text-3xl font-bold md:text-5xl">创建账号</h1>
         <p className="mt-5 text-lg leading-8 text-stone-600">
-          企业用户可以保存需求诊断，服务商可以继续提交入驻申请。当前账号数据保存在本地，后续接真实用户系统。
+          注册时需要设置基础密码，并通过手机或邮箱验证码确认账号归属；注册成功后当前设备会被标记为已信任。
         </p>
         <p className="mt-6 text-sm text-stone-500">
           已有账号？{" "}

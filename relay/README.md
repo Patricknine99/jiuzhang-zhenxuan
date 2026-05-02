@@ -9,7 +9,7 @@
 - 前端提交统一 payload 到 `POST /api/leads`
 - relay 校验数据、读取服务端环境变量
 - relay 分发到飞书、企业微信、钉钉
-- relay 提供手机号/邮箱一次性验证码接口：`POST /api/auth/code`、`POST /api/auth/session`
+- relay 提供账号密码 + 新设备验证码接口：`POST /api/auth/code`、`POST /api/auth/session`
 - relay 预留微信支付接口：`POST /api/payments/wechat/prepay`，未完成签名实现前默认拒绝启用
 - relay 提供 `GET /healthz` / `GET /readyz` 给部署平台做健康检查
 - 数据库接口已保留在 `relay/database.mjs`，当前只返回 no-op 结果，不做持久化
@@ -72,7 +72,9 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - **请求约束**：限制 JSON body 64KB，并要求 `Content-Type: application/json`。
 - **防机器人**：支持 Cloudflare Turnstile。配置 `LEAD_CAPTCHA_REQUIRED=true` 后，线索和验证码接口都会先验证 token。
 - **字段安全**：relay 会限制关键字段长度、去除控制字符，并校验手机号和来源 URL。
-- **动态验证码**：手机号/邮箱验证码在 relay 内存中按 HMAC 存储，含 TTL 和最大尝试次数；dry-run 才会返回 `devCode`。
+- **账号密码**：relay 用 scrypt 哈希保存密码；当前仍是内存账号仓库，接入真实数据库后需迁移到持久化用户表。
+- **新设备验证**：注册必须输入验证码；登录先校验账号密码，若设备未信任，再要求短信或邮箱验证码。
+- **动态验证码**：手机号/邮箱验证码在 relay 内存中按 HMAC 存储，含 TTL、单次使用和最大尝试次数；dry-run 才会返回 `devCode`。
 - **渠道超时**：飞书、企微、钉钉单通道默认 8 秒超时，避免单个渠道拖垮整体提交。
 - **渠道重试**：外部渠道失败会按配置进行短重试，降低偶发网络抖动影响。
 - **优雅退出**：监听 `SIGINT` / `SIGTERM`，便于容器或进程管理器平滑停止。
@@ -89,7 +91,7 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 
 ## 账号与支付接口
 
-### 验证码
+### 账号密码与验证码
 
 ```bash
 curl -X POST http://127.0.0.1:8787/api/auth/code \
@@ -97,7 +99,15 @@ curl -X POST http://127.0.0.1:8787/api/auth/code \
   -d '{"method":"phone","identifier":"13800138000","purpose":"login"}'
 ```
 
-dry-run 模式会返回 `devCode` 便于本地验证；生产环境不得开启 dry-run，也不会返回验证码明文。
+注册或新设备登录时先发送验证码，然后调用 `/api/auth/session`：
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/auth/session \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"phone","identifier":"13800138000","purpose":"register","password":"StrongPass123","code":"123456","role":"buyer","deviceId":"dev_local_123456789"}'
+```
+
+已信任设备再次登录只需要账号密码；新设备登录会返回 `requiresVerification: true`，前端再引导用户获取并输入验证码。dry-run 模式会返回 `devCode` 便于本地验证；生产环境不得开启 dry-run，也不会返回验证码明文。
 
 ### 微信支付
 

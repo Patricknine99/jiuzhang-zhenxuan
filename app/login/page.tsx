@@ -14,7 +14,7 @@ export default function LoginPage() {
         <div className="accent-line mb-5" />
         <h1 className="text-3xl font-bold md:text-5xl">登录账号</h1>
         <p className="mt-5 text-lg leading-8 text-stone-600">
-          当前支持手机号和邮箱验证码流程；配置 relay 后会改用服务端一次性验证码，微信、企微、飞书 OAuth 已预留。
+          使用手机号或邮箱加密码登录。首次在这台设备登录时，需要再输入短信或邮箱验证码完成设备确认。
         </p>
         <p className="mt-6 text-sm text-stone-500">
           还没有账号？{" "}

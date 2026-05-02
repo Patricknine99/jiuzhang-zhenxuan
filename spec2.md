@@ -304,3 +304,22 @@
   5. relay dry-run 验证通过：`GET /healthz` 返回 captcha/auth/payments 状态；`POST /api/leads` 企业需求与服务商入驻均返回 `ok: true`；`POST /api/auth/code` 返回 dry-run `devCode`；`POST /api/auth/session` 可用正确验证码换取账号；错误验证码被拒绝。
   6. `LEAD_CAPTCHA_REQUIRED=true` 且缺少 token 时，线索提交按预期返回“请先完成人机校验”。
   7. 微信支付占位接口在未配置 `WECHAT_PAY_*` 时按预期返回 503。
+
+## 14. ChatGPT 修改记录（2026-05-02 账号密码与新设备验证批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **用户反馈**：登录入口应保留基础账号密码；注册和首次在某台设备登录账号时，再通过手机或邮箱验证码确认，而不是只能验证码登录。
+- **参考原则**：按 OWASP MFA/Authentication 建议，密码作为基础凭证，短信/邮箱验证码作为额外因子；OTP 需要短 TTL、单次使用、限制尝试次数，且新设备属于风险触发场景。
+- **ChatGPT 修改**：
+  1. `components/auth/AuthPanel.tsx` 恢复密码字段，注册必须“账号 + 密码 + 验证码”；登录先“账号 + 密码”，新设备再提示验证码。
+  2. `lib/auth.ts` 新增本机设备 ID 存储键与生成函数，用于前端向 relay 上报设备标识。
+  3. `relay/lead-relay.mjs` 新增内存账号仓库、scrypt 密码哈希、设备信任集合；注册成功信任当前设备，登录新设备时返回 `requiresVerification` 并要求验证码。
+  4. 静态演示模式保留本地模拟：验证码固定 `123456`，并在本地记录演示密码和设备信任；正式上线必须使用 relay 和真实数据库。
+  5. 更新登录/注册页面文案、`relay/README.md`、`docs/integrations.md`，明确当前账号机制。
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run verify:data` 通过。
+  3. `npm run lint` 通过。
+  4. `npm run build` 通过，静态生成 53 个页面。
+  5. relay dry-run 验证通过：注册需要验证码和密码；已信任设备可仅用账号密码登录；新设备登录无验证码时返回 `requiresVerification: true`；新设备输入正确验证码后登录成功；错误密码被拒绝。

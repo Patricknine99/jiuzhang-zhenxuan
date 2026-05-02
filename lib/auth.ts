@@ -10,6 +10,7 @@ export type LocalAccount = {
 };
 
 export const authStorageKey = "jiuzhang:account";
+export const authDeviceStorageKey = "jiuzhang:auth-device-id";
 
 export function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -37,4 +38,13 @@ export function createLocalAccount(method: "email" | "phone", identifier: string
     role,
     createdAt: new Date().toISOString()
   };
+}
+
+export function getOrCreateAuthDeviceId() {
+  if (typeof window === "undefined") return "";
+  const existing = window.localStorage.getItem(authDeviceStorageKey);
+  if (existing) return existing;
+  const next = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+  window.localStorage.setItem(authDeviceStorageKey, next);
+  return next;
 }
