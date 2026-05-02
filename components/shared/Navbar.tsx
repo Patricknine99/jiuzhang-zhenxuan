@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, LogIn, Send, ShieldCheck } from "lucide-react";
+import { ChevronDown, LogIn, Send, ShieldCheck, Users } from "lucide-react";
 import { industryCategories, serviceCategories } from "@/lib/catalog";
 
 export function Navbar() {
@@ -14,9 +14,17 @@ export function Navbar() {
         </Link>
         <div className="hidden items-center gap-7 md:flex">
           <Dropdown
-            label="找服务商"
-            primaryHref="/providers"
+            label="需求方"
+            primaryHref="/buyers"
             groups={[
+              {
+                title: "需求方工作台",
+                links: [
+                  { href: "/buyers", label: "需求方入口", description: "从诊断、匹配到验收的完整路径。" },
+                  { href: "/diagnosis", label: "AI 需求诊断", description: "先把模糊业务问题拆成可执行方案。" },
+                  { href: "/post-demand", label: "发布需求", description: "提交预算、周期和业务痛点，等待平台跟进。" }
+                ]
+              },
               {
                 title: "按服务类型",
                 links: serviceCategories.map((category) => ({
@@ -32,6 +40,20 @@ export function Navbar() {
                   label: category.title,
                   description: category.description
                 }))
+              }
+            ]}
+          />
+          <Dropdown
+            label="供给方"
+            primaryHref="/creators"
+            groups={[
+              {
+                title: "服务商入口",
+                links: [
+                  { href: "/creators", label: "供给方入口", description: "了解认证、案例包装和接单路径。" },
+                  { href: "/join", label: "服务商入驻", description: "提交团队信息、案例、技术栈和预算区间。" },
+                  { href: "/provider-agreement", label: "服务商协议", description: "查看交付、版权、验收与平台规则。" }
+                ]
               }
             ]}
           />
@@ -54,8 +76,9 @@ export function Navbar() {
           </Link>
         </div>
         <div className="flex items-center gap-3">
-          <Link className="hidden text-sm font-medium text-stone-600 hover:text-stone-950 lg:block" href="/join">
-            服务商入驻
+          <Link className="hidden items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-950 lg:inline-flex" href="/creators">
+            <Users className="h-4 w-4" />
+            供给方
           </Link>
           <Link className="hidden items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-950 sm:inline-flex" href="/login">
             <LogIn className="h-4 w-4" />
@@ -75,26 +98,32 @@ export function Navbar() {
         </div>
       </nav>
       <nav className="border-t border-stone-200 px-5 py-2 md:hidden" aria-label="移动端主导航">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 text-sm font-medium text-stone-600">
-          <Link href="/providers" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
-            找服务商
+        <div className="mx-auto flex max-w-6xl items-center gap-2 overflow-x-auto whitespace-nowrap text-sm font-medium text-stone-600">
+          <Link href="/providers" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+            服务商
           </Link>
-          <Link href="/services" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/buyers" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+            需求方
+          </Link>
+          <Link href="/creators" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+            供给方
+          </Link>
+          <Link href="/services" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             服务类型
           </Link>
-          <Link href="/industries" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/industries" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             行业方案
           </Link>
-          <Link href="/cases" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/cases" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             商业案例
           </Link>
-          <Link href="/sla" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/sla" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             验收标准
           </Link>
-          <Link href="/login" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/login" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             登录
           </Link>
-          <Link href="/admin" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/admin" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             后台
           </Link>
         </div>

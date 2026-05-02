@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ClipboardCheck, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, ClipboardCheck, FileText, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { CaseCardDark } from "@/components/shared/CaseCardDark";
 import { ProviderCard } from "@/components/shared/ProviderCard";
 import { SectionHeading } from "@/components/shared/SectionHeading";
@@ -24,27 +24,20 @@ export default function HomePage() {
         <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-stone-600 md:text-xl">
           九章甄选只推荐经过真实商业验证的 AI 创作者与独立工作室。每一笔交付都有资金担保与标准验收。
         </p>
-        <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
+        <div className="mt-10 grid gap-3 sm:grid-cols-2">
           <Link
-            href="/diagnosis"
+            href="/buyers"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-8 py-4 font-semibold text-white shadow-lg shadow-orange-900/20 hover:bg-[var(--color-brand-hover)]"
           >
-            <Search className="h-5 w-5" />
-            免费发布 AI 需求诊断
+            <Building2 className="h-5 w-5" />
+            我是需求方
           </Link>
           <Link
-            href="/services"
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-8 py-4 font-semibold text-stone-700 hover:border-stone-400 hover:bg-white"
-          >
-            <Sparkles className="h-5 w-5" />
-            浏览 AI 服务类型
-          </Link>
-          <Link
-            href="/join"
+            href="/creators"
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-8 py-4 font-semibold text-stone-700 hover:border-stone-400 hover:bg-white"
           >
             <Users className="h-5 w-5" />
-            申请成为精选服务商
+            我是供给方
           </Link>
         </div>
         <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-stone-500">
@@ -57,6 +50,29 @@ export default function HomePage() {
           <span>
             资金纠纷 <strong className="text-stone-950">0 起</strong>
           </span>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-5 pb-8 md:px-6">
+        <div className="grid gap-5 md:grid-cols-2">
+          <RolePath
+            eyebrow="企业 / 品牌 / 中小商家"
+            title="需求方工作台"
+            text="从 AI 需求诊断、服务商短名单、预算预估，到验收与资金节点管理，需求方有独立路径。"
+            href="/buyers"
+            action="进入需求方入口"
+            icon="buyer"
+            items={["AI 需求诊断", "服务商匹配", "SLA 验收", "账号记录"]}
+          />
+          <RolePath
+            eyebrow="AI 创作者 / 工作室 / OPC"
+            title="供给方工作台"
+            text="从服务商认证、案例包装、能力标签，到接单和交付信用沉淀，供给方不再只是一个入驻表单。"
+            href="/creators"
+            action="进入供给方入口"
+            icon="creator"
+            items={["认证分级", "案例包装", "接单匹配", "信用沉淀"]}
+          />
         </div>
       </section>
 
@@ -131,11 +147,11 @@ export default function HomePage() {
             <p className="text-sm font-semibold text-[var(--color-brand)]">交付稳定性</p>
             <h2 className="mt-2 text-2xl font-bold md:text-3xl">线索进入后端中转，再分发到业务渠道</h2>
             <p className="mt-4 leading-8 text-stone-600">
-              当前版本保留数据库接口空位，先通过独立 relay 完成飞书、企业微信、钉钉分发，并提供健康检查、限流、超时和请求编号。
+              当前版本通过独立 relay 完成 PostgreSQL 落库、Redis 限流与验证码状态、飞书/企微/钉钉分发，并提供健康检查、超时和请求编号。
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {["/healthz 健康检查", "请求限流保护", "8 秒渠道超时", "数据库接口预留"].map((item) => (
+            {["/healthz 健康检查", "Redis 限流保护", "8 秒渠道超时", "PostgreSQL 线索落库"].map((item) => (
               <div key={item} className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-700">
                 {item}
               </div>
@@ -179,6 +195,50 @@ export default function HomePage() {
         </Link>
       </section>
     </>
+  );
+}
+
+function RolePath({
+  eyebrow,
+  title,
+  text,
+  href,
+  action,
+  icon,
+  items
+}: {
+  eyebrow: string;
+  title: string;
+  text: string;
+  href: string;
+  action: string;
+  icon: "buyer" | "creator";
+  items: string[];
+}) {
+  const Icon = icon === "buyer" ? FileText : Sparkles;
+  return (
+    <div className="editorial-card rounded-2xl bg-white p-6 md:p-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-brand)]">{eyebrow}</p>
+          <h2 className="mt-2 text-2xl font-bold">{title}</h2>
+        </div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-[var(--color-brand)]">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+      <p className="mt-4 text-sm leading-7 text-stone-500">{text}</p>
+      <div className="mt-5 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span key={item} className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600">
+            {item}
+          </span>
+        ))}
+      </div>
+      <Link href={href} className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-brand)]">
+        {action} <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
   );
 }
 

@@ -13,6 +13,12 @@ export function Footer() {
             <span className="text-sm text-stone-400">© {new Date().getFullYear()}</span>
           </Link>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-stone-500">
+            <Link href="/buyers" className="hover:text-stone-950">
+              需求方入口
+            </Link>
+            <Link href="/creators" className="hover:text-stone-950">
+              供给方入口
+            </Link>
             <Link href="/provider-agreement" className="hover:text-stone-950">
               服务商协议
             </Link>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { FieldGroup } from "@/components/shared/FieldGroup";
 import { FormSection } from "@/components/shared/FormSection";
@@ -16,6 +17,13 @@ export default function PostDemandPage() {
       title="发布企业 AI 需求"
       description="不用先写完整 PRD。把业务痛点、预算范围和期望交付告诉我们，平台产品经理会先帮你判断方向和匹配服务商。"
     >
+      <div className="mb-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-7 text-stone-600">
+        这是需求方通道。还没想清楚预算或交付范围，可以先从{" "}
+        <Link href="/buyers" className="font-semibold text-[var(--color-brand)]">
+          需求方入口
+        </Link>{" "}
+        查看完整流程。
+      </div>
       <StaticForm successPath="/post-demand/success" leadType="demand">
         <Suspense fallback={null}>
           <LeadContextNotice />

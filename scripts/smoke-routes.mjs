@@ -1,6 +1,8 @@
 const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost:3000";
 const routes = [
   "/",
+  "/buyers",
+  "/creators",
   "/providers",
   "/providers/spark-ai-automation",
   "/cases",

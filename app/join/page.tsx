@@ -16,7 +16,11 @@ export default function JoinPage() {
       description="平台会根据真实案例、交付能力、行业适配度进行初步筛选，3 个工作日内邮件通知审核结果。"
     >
       <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-900">
-        建议先注册服务商账号，后续可查看审核状态和补充资料。当前账号系统已支持手机号和邮箱。{" "}
+        这是供给方通道。建议先了解{" "}
+        <Link href="/creators" className="font-semibold text-[var(--color-brand)]">
+          供给方认证路径
+        </Link>
+        ，并注册服务商账号，后续可查看审核状态和补充资料。{" "}
         <Link href="/register" className="font-semibold text-[var(--color-brand)]">
           去注册服务商账号
         </Link>
