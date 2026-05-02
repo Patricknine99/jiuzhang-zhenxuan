@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { HumanVerificationField } from "@/components/shared/HumanVerificationField";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { TurnstileField } from "@/components/shared/TurnstileField";
 import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integrations";
 
 type RelayResponse = {
@@ -121,7 +121,7 @@ export function StaticForm({
         <label htmlFor={honeypotName}>Website</label>
         <input id={honeypotName} name={honeypotName} type="text" tabIndex={-1} autoComplete="off" />
       </div>
-      <TurnstileField />
+      <HumanVerificationField />
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}

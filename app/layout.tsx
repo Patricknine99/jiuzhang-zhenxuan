@@ -1,21 +1,8 @@
 import type { Metadata } from "next";
-import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 import { Footer } from "@/components/shared/Footer";
 import { Navbar } from "@/components/shared/Navbar";
 import { FloatingSupport } from "@/components/support/FloatingSupport";
-
-const sans = Noto_Sans_SC({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  weight: ["300", "400", "500", "700", "900"]
-});
-
-const serif = Noto_Serif_SC({
-  subsets: ["latin"],
-  variable: "--font-serif",
-  weight: ["400", "600", "700", "900"]
-});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://jiuzhang-zhenxuan.com";
 
@@ -41,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className={`${sans.variable} ${serif.variable}`}>
+    <html lang="zh-CN">
       <body>
         <Navbar />
         <main>{children}</main>

@@ -10,9 +10,11 @@ const RATE_LIMIT_MAX = Number(process.env.LEAD_RATE_LIMIT_MAX || 20);
 const CHANNEL_RETRY_COUNT = Number(process.env.LEAD_CHANNEL_RETRY_COUNT || 1);
 const CHANNEL_RETRY_BASE_MS = Number(process.env.LEAD_CHANNEL_RETRY_BASE_MS || 250);
 const CAPTCHA_REQUIRED = process.env.LEAD_CAPTCHA_REQUIRED === "true";
-const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "";
+const CAPTCHA_PROVIDER = process.env.CAPTCHA_PROVIDER || "";
+const CAPTCHA_SECRET_KEY = process.env.CAPTCHA_SECRET_KEY || "";
 const AUTH_CODE_TTL_MS = Number(process.env.AUTH_CODE_TTL_MS || 5 * 60_000);
 const AUTH_CODE_MAX_ATTEMPTS = Number(process.env.AUTH_CODE_MAX_ATTEMPTS || 5);
+const ADMIN_SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 8 * 60 * 60_000);
 
 const CHANNELS = parseChannels(process.env.LEAD_CHANNELS || "feishu");
 const ALLOWED_ORIGINS = parseList(process.env.LEAD_ALLOWED_ORIGINS || "*");
@@ -21,6 +23,14 @@ const DRY_RUN = process.env.LEAD_RELAY_DRY_RUN === "true";
 const RATE_LIMIT_BUCKETS = new Map();
 const AUTH_CODE_BUCKETS = new Map();
 const AUTH_ACCOUNTS = new Map();
+
+const ADMIN_ROLE_PERMISSIONS = {
+  owner: ["leads:read", "leads:assign", "providers:review", "content:edit", "payments:review", "settings:manage", "audit:read"],
+  ops: ["leads:read", "leads:assign", "providers:review", "content:edit", "audit:read"],
+  support: ["leads:read", "leads:assign"],
+  finance: ["leads:read", "payments:review", "audit:read"],
+  auditor: ["leads:read", "audit:read"]
+};
 
 const server = createServer(async (request, response) => {
   const origin = request.headers.origin || "";
@@ -53,8 +63,8 @@ const server = createServer(async (request, response) => {
       },
       captcha: {
         required: CAPTCHA_REQUIRED,
-        provider: "turnstile",
-        configured: Boolean(TURNSTILE_SECRET_KEY)
+        provider: CAPTCHA_PROVIDER || "reserved-domestic",
+        configured: Boolean(CAPTCHA_SECRET_KEY)
       },
       auth: {
         codeTtlMs: AUTH_CODE_TTL_MS,
@@ -66,6 +76,10 @@ const server = createServer(async (request, response) => {
       payments: {
         wechatPayReserved: true,
         configured: hasWechatPayConfig()
+      },
+      admin: {
+        configured: hasAdminConfig(),
+        roles: Object.keys(ADMIN_ROLE_PERMISSIONS)
       },
       requestId
     });
@@ -92,7 +106,17 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  if (!["/api/leads", "/api/auth/code", "/api/auth/session", "/api/payments/wechat/prepay"].includes(pathname)) {
+  if (pathname === "/api/admin/session") {
+    await handleAdminSessionRequest(request, response, origin, requestId);
+    return;
+  }
+
+  if (pathname === "/api/admin/me") {
+    await handleAdminMeRequest(request, response, origin, requestId);
+    return;
+  }
+
+  if (!["/api/leads", "/api/auth/code", "/api/auth/session", "/api/payments/wechat/prepay", "/api/admin/session", "/api/admin/me"].includes(pathname)) {
     sendError(response, 404, "not_found", "Not found", requestId);
     return;
   }
@@ -336,6 +360,76 @@ async function handleWechatPrepayRequest(request, response, origin, requestId) {
         : "WeChat Pay is reserved but not configured. Set WECHAT_PAY_* server-side variables before enabling payments."
     }
   });
+}
+
+async function handleAdminSessionRequest(request, response, origin, requestId) {
+  if (request.method !== "POST") {
+    response.setHeader("Allow", "POST, OPTIONS");
+    sendError(response, 405, "method_not_allowed", "Method is not allowed", requestId);
+    return;
+  }
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  if (!isJsonRequest(request)) {
+    sendError(response, 415, "unsupported_media_type", "Content-Type must be application/json", requestId);
+    return;
+  }
+
+  const rateLimit = consumeRateLimit(`admin:${getClientKey(request)}`);
+  if (!rateLimit.ok) {
+    response.setHeader("Retry-After", String(Math.ceil(rateLimit.retryAfterMs / 1000)));
+    sendError(response, 429, "rate_limited", "Too many admin login attempts, please retry later", requestId);
+    return;
+  }
+
+  try {
+    if (!hasAdminConfig()) throw new Error("Admin account is not configured on relay");
+    const body = await readJsonBody(request);
+    const email = normalizeAdminEmail(body.email);
+    const password = normalizePassword(body.password);
+    const expectedEmail = normalizeAdminEmail(process.env.ADMIN_BOOTSTRAP_EMAIL);
+    const expectedPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
+    if (email !== expectedEmail || !isValidSecret(password, expectedPassword)) throw new Error("管理员账号或密码不正确");
+
+    const role = normalizeAdminRole(process.env.ADMIN_BOOTSTRAP_ROLE || "owner");
+    const account = {
+      id: `admin_${signValue(email).slice(0, 10)}`,
+      email,
+      name: process.env.ADMIN_BOOTSTRAP_NAME || "管理员",
+      role,
+      permissions: ADMIN_ROLE_PERMISSIONS[role],
+      createdAt: new Date().toISOString()
+    };
+    sendJson(response, 200, {
+      ok: true,
+      requestId,
+      token: signAdminToken(account),
+      account
+    });
+  } catch (error) {
+    sendError(response, 400, "bad_request", error instanceof Error ? error.message : "Invalid admin request", requestId);
+  }
+}
+
+async function handleAdminMeRequest(request, response, origin, requestId) {
+  if (request.method !== "GET") {
+    response.setHeader("Allow", "GET, OPTIONS");
+    sendError(response, 405, "method_not_allowed", "Method is not allowed", requestId);
+    return;
+  }
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  try {
+    const token = getBearerToken(request);
+    const payload = verifyAdminToken(token);
+    sendJson(response, 200, { ok: true, requestId, account: payload.account, expiresAt: payload.expiresAt });
+  } catch (error) {
+    sendError(response, 401, "invalid_admin_session", error instanceof Error ? error.message : "Invalid admin session", requestId);
+  }
 }
 
 async function submitWithRetry(channel, submit, timeoutMessage) {
@@ -713,26 +807,13 @@ function requireEnv(key) {
 }
 
 async function verifyCaptchaToken(token, remoteIp, requestId) {
+  void remoteIp;
+  void requestId;
   if (!CAPTCHA_REQUIRED) return;
-  if (!TURNSTILE_SECRET_KEY) throw new Error("Captcha is required but TURNSTILE_SECRET_KEY is missing");
+  if (!CAPTCHA_PROVIDER || !CAPTCHA_SECRET_KEY) throw new Error("Captcha is required but domestic captcha provider is not configured");
   if (typeof token !== "string" || !token.trim()) throw new Error("请先完成人机校验");
-
-  const response = await withTimeout(
-    fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        secret: TURNSTILE_SECRET_KEY,
-        response: token,
-        remoteip: remoteIp,
-        idempotency_key: requestId
-      })
-    }),
-    REQUEST_TIMEOUT_MS,
-    "Captcha verification timed out"
-  );
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.success) throw new Error("人机校验未通过，请刷新后重试");
+  if (DRY_RUN && token.startsWith("local-human-check:")) return;
+  throw new Error("国内防机器人验证码服务已预留，待接入腾讯云验证码、阿里云验证码或极验后启用");
 }
 
 function normalizeAuthMethod(value) {
@@ -748,6 +829,17 @@ function normalizeAuthIdentifier(method, value) {
   return normalized;
 }
 
+function normalizeAdminEmail(value) {
+  if (typeof value !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim().toLowerCase())) {
+    throw new Error("管理员邮箱格式不正确");
+  }
+  return value.trim().toLowerCase();
+}
+
+function normalizeAdminRole(value) {
+  return Object.prototype.hasOwnProperty.call(ADMIN_ROLE_PERMISSIONS, value) ? value : "auditor";
+}
+
 function normalizePassword(value) {
   if (typeof value !== "string" || value.length < 8) throw new Error("密码至少需要 8 位");
   if (value.length > 128) throw new Error("密码长度不能超过 128 位");
@@ -759,6 +851,34 @@ function normalizeDeviceId(value) {
     throw new Error("设备标识缺失或格式不正确");
   }
   return value;
+}
+
+function hasAdminConfig() {
+  return Boolean(process.env.ADMIN_BOOTSTRAP_EMAIL && process.env.ADMIN_BOOTSTRAP_PASSWORD);
+}
+
+function signAdminToken(account) {
+  const payload = {
+    account,
+    expiresAt: Date.now() + ADMIN_SESSION_TTL_MS
+  };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${signValue(encoded)}`;
+}
+
+function verifyAdminToken(token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) throw new Error("管理员会话缺失");
+  const [encoded, signature] = token.split(".");
+  if (!isValidSecret(signature, signValue(encoded))) throw new Error("管理员会话签名无效");
+  const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+  if (!payload?.account || Date.now() > payload.expiresAt) throw new Error("管理员会话已过期");
+  return payload;
+}
+
+function getBearerToken(request) {
+  const authorization = request.headers.authorization;
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) return "";
+  return authorization.slice("Bearer ".length).trim();
 }
 
 function getAuthCodeKey(method, identifier, purpose) {

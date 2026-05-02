@@ -84,7 +84,7 @@ DINGTALK_AT_MOBILES=
 - 当前账号页：`/login`、`/register`、`/account`
 - 当前已做手机号/邮箱 + 密码的基础登录注册流程。注册时必须验证码；登录先校验账号密码，若是这台设备首次登录该账号，再要求短信或邮箱验证码。
 - 未配置 `NEXT_PUBLIC_AUTH_RELAY_URL` 时仅用于静态演示，验证码固定为 `123456`；配置后会调用 relay 的 `/api/auth/code` 与 `/api/auth/session`，由服务端校验一次性验证码和设备信任状态。
-- 防机器人使用 Cloudflare Turnstile 预留：前端配置 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 后显示校验组件；relay 配置 `LEAD_CAPTCHA_REQUIRED=true` 与 `TURNSTILE_SECRET_KEY` 后强制验证。
+- 防机器人按国内环境预留：前端配置 `NEXT_PUBLIC_CAPTCHA_PROVIDER` 后显示校验占位；relay 配置 `LEAD_CAPTCHA_REQUIRED=true`、`CAPTCHA_PROVIDER` 与 `CAPTCHA_SECRET_KEY` 后强制验证。候选优先考虑腾讯云验证码、阿里云验证码或极验，不加载境外验证码脚本。
 - 微信、企业微信、飞书 OAuth 入口保留为禁用状态，等待真实开放平台应用信息后接入。
 
 ## 9. 微信支付预留
@@ -95,7 +95,19 @@ DINGTALK_AT_MOBILES=
 - 未配置 `WECHAT_PAY_*` 时返回 503，配置齐全但签名实现未完成时返回 501，避免出现“前端可点但支付链路不可用”的误导。
 - 生产环境需要补齐微信支付商户证书签名、回调验签、订单幂等、金额服务端计算、支付状态查询和退款权限控制。
 
-## 10. 灰度与生产检查
+## 10. 管理员后台
+
+由 ChatGPT 于 2026-05-02 补充：
+
+- 后台页面：`/admin`
+- 前端管理员 relay：`NEXT_PUBLIC_ADMIN_RELAY_URL`
+- relay 接口：`POST /api/admin/session`、`GET /api/admin/me`
+- 管理员配置：`ADMIN_BOOTSTRAP_EMAIL`、`ADMIN_BOOTSTRAP_PASSWORD`、`ADMIN_BOOTSTRAP_NAME`、`ADMIN_BOOTSTRAP_ROLE`、`ADMIN_SESSION_TTL_MS`
+- 角色模型：超级管理员、运营管理员、客服坐席、财务审核、审计只读。
+- 权限模型：查看线索、分配跟进、审核服务商、编辑内容、查看支付、系统设置、查看审计。
+- 当前后台包含线索处理队列、权限矩阵、今日运营清单、审计预览、支付权限提示；真实数据库接入后可把本地最近提交替换为服务端线索表。
+
+## 11. 灰度与生产检查
 
 由 ChatGPT 于 2026-05-02 补充：
 

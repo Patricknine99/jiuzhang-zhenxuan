@@ -13,6 +13,7 @@ const routes = [
   "/login",
   "/register",
   "/account",
+  "/admin",
   "/status",
   "/post-demand",
   "/join",

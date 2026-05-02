@@ -11,6 +11,7 @@
 - relay 分发到飞书、企业微信、钉钉
 - relay 提供账号密码 + 新设备验证码接口：`POST /api/auth/code`、`POST /api/auth/session`
 - relay 预留微信支付接口：`POST /api/payments/wechat/prepay`，未完成签名实现前默认拒绝启用
+- relay 提供管理员会话接口：`POST /api/admin/session`、`GET /api/admin/me`
 - relay 提供 `GET /healthz` / `GET /readyz` 给部署平台做健康检查
 - 数据库接口已保留在 `relay/database.mjs`，当前只返回 no-op 结果，不做持久化
 
@@ -60,8 +61,9 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - `LEAD_CHANNEL_RETRY_COUNT` 控制外部渠道失败重试次数，默认 1 次
 - `LEAD_CHANNEL_RETRY_BASE_MS` 控制重试基础等待时间，默认 250ms
 - 飞书、企微、钉钉密钥只放 relay 环境变量
-- 上线前启用 `LEAD_CAPTCHA_REQUIRED=true`，并同时配置 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 与 `TURNSTILE_SECRET_KEY`
+- 上线前启用 `LEAD_CAPTCHA_REQUIRED=true`，并同时配置国内验证码服务的 `NEXT_PUBLIC_CAPTCHA_PROVIDER`、`CAPTCHA_PROVIDER` 与 `CAPTCHA_SECRET_KEY`
 - 微信支付只允许服务端配置 `WECHAT_PAY_*`，不要把商户号、私钥、API v3 密钥放到 `NEXT_PUBLIC_*`
+- 后台管理员必须配置 `ADMIN_BOOTSTRAP_EMAIL`、`ADMIN_BOOTSTRAP_PASSWORD`、`ADMIN_BOOTSTRAP_ROLE`，并定期轮换密码
 
 ## 稳定性机制
 
@@ -70,7 +72,7 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - **基础限流**：内存级 IP 限流用于早期防刷；正式生产可叠加网关或云函数限流。
 - **限流清理**：内存限流桶会定时清理，避免长时间运行后累积过多过期 IP。
 - **请求约束**：限制 JSON body 64KB，并要求 `Content-Type: application/json`。
-- **防机器人**：支持 Cloudflare Turnstile。配置 `LEAD_CAPTCHA_REQUIRED=true` 后，线索和验证码接口都会先验证 token。
+- **防机器人**：按国内环境预留，优先接腾讯云验证码、阿里云验证码或极验。配置 `LEAD_CAPTCHA_REQUIRED=true` 后，线索和验证码接口都会先验证 token。
 - **字段安全**：relay 会限制关键字段长度、去除控制字符，并校验手机号和来源 URL。
 - **账号密码**：relay 用 scrypt 哈希保存密码；当前仍是内存账号仓库，接入真实数据库后需迁移到持久化用户表。
 - **新设备验证**：注册必须输入验证码；登录先校验账号密码，若设备未信任，再要求短信或邮箱验证码。
@@ -112,3 +114,13 @@ curl -X POST http://127.0.0.1:8787/api/auth/session \
 ### 微信支付
 
 `POST /api/payments/wechat/prepay` 当前只做安全占位：如果未配置 `WECHAT_PAY_*` 返回 503；如果配置齐全但签名逻辑尚未完成，返回 501。这样可以避免前端误以为支付已可用。
+
+## 管理员后台
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/admin/session \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@jiuzhang.local","password":"AdminDemo123!"}'
+```
+
+管理员会话 token 由 relay 使用 HMAC 签名，默认 8 小时过期。当前是 bootstrap 管理员配置，适合 MVP 阶段；正式上线应迁移到数据库管理员表，增加密码哈希、多管理员管理、禁用账号、操作审计和强制 MFA。

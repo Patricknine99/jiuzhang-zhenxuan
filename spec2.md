@@ -68,7 +68,7 @@
 2. **P1：表单成功页展示提交结果**  
    当前成功页不展示各渠道结果；后续可把 relay 返回结果存入 sessionStorage 后展示。
 3. **P1：反滥用增强**  
-   增加 Turnstile/验证码、IP 限流或云函数网关限流。
+   增加国内防机器人验证码、IP 限流或云函数网关限流。
 4. **P2：飞书字段中文列名适配**  
    如果实际飞书表使用中文字段名，需要调整 `toFeishuFields()` 映射。
 
@@ -284,14 +284,14 @@
   3. 微信支付未明确接口状态，容易被误认为已可用。
   4. 二级页面已完成，但缺少“服务类型 × 行业”的三级承接页。
 - **ChatGPT 修改**：
-  1. 新增 `components/shared/TurnstileField.tsx`，前端通过 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 显示 Cloudflare Turnstile。
+  1. 新增防机器人校验组件，后续可接入真实验证码服务。
   2. 更新 `components/shared/StaticForm.tsx`，线索表单提交 `captchaToken`，继续保留隐藏蜜罐。
-  3. 更新 `relay/lead-relay.mjs`，新增 Turnstile 服务端验证、字段长度限制、控制字符清理、手机号校验、来源 URL 校验。
+  3. 更新 `relay/lead-relay.mjs`，新增防机器人验证码服务端校验预留、字段长度限制、控制字符清理、手机号校验、来源 URL 校验。
   4. 更新 `relay/lead-relay.mjs`，新增 `/api/auth/code` 与 `/api/auth/session`，手机号/邮箱验证码在服务端按 HMAC 存储，含 TTL 与最大尝试次数；dry-run 才返回 `devCode`。
   5. 更新 `components/auth/AuthPanel.tsx`，手机号和邮箱统一改为验证码登录/注册；配置 `NEXT_PUBLIC_AUTH_RELAY_URL` 后走服务端验证码，未配置时仅保留静态演示验证码 `123456`。
   6. 更新 `relay/lead-relay.mjs`，新增 `/api/payments/wechat/prepay` 安全占位；未配置微信支付返回 503，配置齐全但签名实现未完成返回 501。
   7. 新增 `/solutions/[service]/[industry]` 三级方案页，并从服务类型页、行业页进入；静态导出 16 个组合页。
-  8. 更新 `.env.example`、`scripts/check-env.mjs`、`docs/integrations.md`、`relay/README.md`，补充 Turnstile、验证码、微信支付生产配置要求。
+  8. 更新 `.env.example`、`scripts/check-env.mjs`、`docs/integrations.md`、`relay/README.md`，补充国内验证码、微信支付生产配置要求。
 - **接口预留状态**：
   1. 飞书、企业微信、钉钉线索接口已在 relay 中保留并 dry-run 验证。
   2. 微信、企业微信、飞书 OAuth 登录入口仍保持禁用预留，等待真实开放平台应用参数。
@@ -323,3 +323,31 @@
   3. `npm run lint` 通过。
   4. `npm run build` 通过，静态生成 53 个页面。
   5. relay dry-run 验证通过：注册需要验证码和密码；已信任设备可仅用账号密码登录；新设备登录无验证码时返回 `requiresVerification: true`；新设备输入正确验证码后登录成功；错误密码被拒绝。
+
+## 15. ChatGPT 修改记录（2026-05-02 管理员后台批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **用户反馈**：需要后端管理员网站页面，方便不懂技术的客户（如客服）操作，并加入管理员账号和权限。
+- **ChatGPT 修改**：
+  1. 新增 `/admin` 后台管理员页面，面向客服、运营、财务和管理员使用。
+  2. 新增 `components/admin/AdminConsole.tsx`，包含管理员登录、线索处理队列、今日优先事项、权限矩阵、审计预览和支付权限提示。
+  3. 新增 `lib/admin.ts`，定义管理员角色：超级管理员、运营管理员、客服坐席、财务审核、审计只读。
+  4. 新增权限模型：查看线索、分配跟进、审核服务商、编辑内容、查看支付、系统设置、查看审计。
+  5. 更新 `relay/lead-relay.mjs`，新增 `POST /api/admin/session` 与 `GET /api/admin/me`，支持 bootstrap 管理员账号、角色权限、HMAC 签名会话 token 和过期时间。
+  6. 更新 `.env.example` 与 `scripts/check-env.mjs`，加入 `ADMIN_BOOTSTRAP_*` 和 `NEXT_PUBLIC_ADMIN_RELAY_URL` 生产配置要求。
+  7. 导航栏新增后台入口；`robots.txt` 禁止索引 `/admin`；smoke 路由加入 `/admin`。
+- **在用户要求基础上的拓展**：
+  1. 后台加入客服可执行的“今日优先事项”清单，降低非技术人员上手成本。
+  2. 后台加入审计预览模块，为后续记录分配、审核、支付复核和系统设置变更预留结构。
+  3. 后台加入支付权限提示，财务相关操作默认只给财务或超级管理员。
+  4. 后台读取本地最近提交记录作为线索队列占位，后续接数据库后可替换为服务端全量线索。
+  5. 移除构建期外网字体依赖，改用中文系统字体栈，避免国内/离线构建时因境外字体下载失败导致部署中断。
+  6. 按国内用户要求移除 Cloudflare Turnstile 相关代码与配置，改为国内验证码服务预留位，候选腾讯云验证码、阿里云验证码或极验。
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run verify:data` 通过。
+  3. `npm run lint` 通过。
+  4. `npm run build` 通过，静态生成 54 个页面。
+  5. `npm run smoke:routes` 通过，`/admin` 返回 200，未知动态路由返回 404。
+  6. relay dry-run 管理员验证通过：`GET /healthz` 返回 `admin.configured: true`；正确管理员账号可登录并返回角色权限和 token；错误密码被拒绝；`GET /api/admin/me` 可验证签名 token。

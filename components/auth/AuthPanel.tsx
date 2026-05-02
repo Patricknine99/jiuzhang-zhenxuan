@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, MessageCircle, Phone, UserRound } from "lucide-react";
+import { HumanVerificationField } from "@/components/shared/HumanVerificationField";
 import { authStorageKey, createLocalAccount, getOrCreateAuthDeviceId, isValidEmail, isValidPhone, type LocalAccount } from "@/lib/auth";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { TurnstileField } from "@/components/shared/TurnstileField";
 
 type AuthMode = "login" | "register";
 type Method = "email" | "phone";
@@ -201,7 +201,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           </div>
         )}
 
-        <TurnstileField />
+        <HumanVerificationField />
 
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
         {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
