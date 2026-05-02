@@ -123,7 +123,7 @@ export function DiagnosisWorkspace() {
         ) : null}
         {aiNote ? <p className="mt-5 rounded-xl bg-orange-300/10 p-4 text-sm leading-7 text-orange-100">{aiNote}</p> : null}
         <Link
-          href={`/post-demand?diagnosis=${encodeURIComponent(answers.join(" / "))}`}
+          href={`/post-demand?diagnosis=${encodeURIComponent(safeDiagnosisSlug(answers.join(" / ")))}`}
           aria-disabled={answers.length === 0}
           className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 font-semibold text-white ${
             answers.length === 0
@@ -179,4 +179,14 @@ function getDiagnosisTimeoutMs() {
 
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+const MAX_DIAGNOSIS_LENGTH = 200;
+
+function safeDiagnosisSlug(raw: string) {
+  return raw
+    .replace(/[\x00-\x1f\x7f-\x9f]/g, "") // strip control characters
+    .replace(/[<>{}[\]\\|`^~]/g, "")        // strip characters with URL/shell significance
+    .slice(0, MAX_DIAGNOSIS_LENGTH)
+    .trim();
 }

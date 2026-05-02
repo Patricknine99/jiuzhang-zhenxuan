@@ -78,6 +78,9 @@ export function Navbar() {
           <Link href="/services" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             服务类型
           </Link>
+          <Link href="/industries" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+            行业方案
+          </Link>
           <Link href="/cases" className="rounded-lg px-2 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             商业案例
           </Link>

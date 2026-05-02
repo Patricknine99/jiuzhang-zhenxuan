@@ -6,6 +6,7 @@ type Submission = {
   type: "demand" | "application";
   requestId: string;
   ok: boolean;
+  partialFailure?: boolean;
   submittedAt: string;
   results: Array<{
     ok: boolean;
@@ -22,6 +23,12 @@ export function SubmissionSummary({ expectedType }: { expectedType: Submission["
 
   return (
     <div className="mt-8 rounded-2xl border border-stone-200 bg-white p-5 text-left">
+      {submission.partialFailure ? (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">部分渠道投递异常</p>
+          <p className="mt-1 text-amber-700">您的需求已成功接收，但个别通知渠道暂时未能送达。平台产品经理仍会按时跟进，请放心。</p>
+        </div>
+      ) : null}
       <p className="text-sm font-semibold text-stone-950">提交记录</p>
       <dl className="mt-3 space-y-2 text-sm text-stone-600">
         <div className="flex justify-between gap-4">

@@ -256,6 +256,12 @@ async function submitToDingTalk(payload) {
 
 function normalizeLeadPayload(body) {
   if (!body || typeof body !== "object") throw new Error("Body must be an object");
+
+  // Honeypot detection — reject payloads where a hidden field has been filled.
+  if (typeof body["jiuzhang_website_url"] === "string" && body["jiuzhang_website_url"].trim()) {
+    throw new Error("Suspicious submission detected");
+  }
+
   if (body.type === "demand") {
     requireString(body.company, "company");
     requireString(body.contactName, "contactName");

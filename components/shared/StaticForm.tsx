@@ -7,6 +7,7 @@ import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integration
 
 type RelayResponse = {
   ok?: boolean;
+  partialFailure?: boolean;
   message?: string;
   requestId?: string;
   error?: {
@@ -34,6 +35,8 @@ export function StaticForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [requestId, setRequestId] = useState("");
+  const lastSubmitRef = useRef(0);
+  const honeypotName = "jiuzhang_website_url";
   const draftKey = `jiuzhang:${leadType}:draft`;
   const draftTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -63,6 +66,15 @@ export function StaticForm({
         event.preventDefault();
         setError("");
         setRequestId("");
+
+        // Submission cooldown — prevent double-clicks and rapid re-submissions.
+        const now = Date.now();
+        if (now - lastSubmitRef.current < 5000) {
+          setError("请稍等片刻后再提交");
+          return;
+        }
+        lastSubmitRef.current = now;
+
         setIsSubmitting(true);
         try {
           const payload = buildLeadPayload(new FormData(event.currentTarget), leadType);
@@ -103,6 +115,11 @@ export function StaticForm({
       }}
     >
       {children}
+      {/* Honeypot: hidden field that bots fill but humans never see. If filled, relay will reject. */}
+      <div className="absolute opacity-0 pointer-events-none" aria-hidden="true" tabIndex={-1}>
+        <label htmlFor={honeypotName}>Website</label>
+        <input id={honeypotName} name={honeypotName} type="text" tabIndex={-1} autoComplete="off" />
+      </div>
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
@@ -193,6 +210,7 @@ function rememberSubmission(type: LeadPayload["type"], body: RelayResponse, requ
     type,
     requestId,
     ok: body.ok ?? true,
+    partialFailure: body.partialFailure ?? false,
     results: body.results || [],
     submittedAt: new Date().toISOString()
   };

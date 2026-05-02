@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/providers",
     "/cases",
     "/services",
+    "/industries",
     "/diagnosis",
     "/login",
     "/register",
