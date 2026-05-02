@@ -13,12 +13,13 @@
 - relay 预留微信支付接口：`POST /api/payments/wechat/prepay`，未完成签名实现前默认拒绝启用
 - relay 提供管理员会话接口：`POST /api/admin/session`、`GET /api/admin/me`
 - relay 提供 `GET /healthz` / `GET /readyz` 给部署平台做健康检查
-- 数据库接口已保留在 `relay/database.mjs`，当前只返回 no-op 结果，不做持久化
+- PostgreSQL/Redis 已接入本地模拟环境，但通过适配层解耦：`relay/db.mjs` 只负责 PostgreSQL 连接，`relay/redis.mjs` 只负责 Redis 状态，业务持久化集中在 `relay/database.mjs`，运行配置集中在 `relay/config.mjs`
 
 ## 本地 dry-run
 
 ```bash
 cp .env.example .env.local
+npm run db:init
 LEAD_RELAY_DRY_RUN=true npm run relay:dev
 ```
 
@@ -27,7 +28,7 @@ LEAD_RELAY_DRY_RUN=true npm run relay:dev
 ```bash
 curl -X POST http://127.0.0.1:8787/api/leads \
   -H 'Content-Type: application/json' \
-  -H 'X-Lead-Relay-Secret: change-me' \
+  -H 'X-Lead-Relay-Secret: replace-with-your-local-secret' \
   -d '{
     "type": "demand",
     "company": "测试公司",
@@ -56,6 +57,10 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - `LEAD_RELAY_DRY_RUN=false`
 - `LEAD_ALLOWED_ORIGINS` 只填写正式域名
 - `LEAD_RELAY_SECRET` 使用强随机字符串
+- `DATABASE_URL` 和 `REDIS_URL` 只放服务端环境变量，不要提交真实密码到 Git
+- 云端数据库通常由控制台先创建库和账号，保持 `DB_INIT_CREATE_DATABASE=false`，让 `npm run db:init` 只建表和导入种子数据
+- 只有本地角色明确拥有建库权限时，才设置 `DB_INIT_CREATE_DATABASE=true`
+- PostgreSQL/Redis 连接池、超时和重试只通过环境变量调整，不需要改业务代码
 - `LEAD_RATE_LIMIT_MAX` 按部署环境限流能力调整，默认每 IP 每分钟 20 次
 - `LEAD_REQUEST_TIMEOUT_MS` 控制单个外部渠道调用超时，默认 8000ms
 - `LEAD_CHANNEL_RETRY_COUNT` 控制外部渠道失败重试次数，默认 1 次
@@ -69,18 +74,17 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 
 - **统一响应**：所有错误返回 `{ ok: false, error, message, requestId }`，便于前端展示和人工排查。
 - **请求编号**：每次请求会返回 `X-Request-Id` 与 JSON `requestId`。
-- **基础限流**：内存级 IP 限流用于早期防刷；正式生产可叠加网关或云函数限流。
-- **限流清理**：内存限流桶会定时清理，避免长时间运行后累积过多过期 IP。
+- **基础限流**：Redis 滑动窗口限流用于本地模拟与生产前验证；正式生产可再叠加云网关限流。
 - **请求约束**：限制 JSON body 64KB，并要求 `Content-Type: application/json`。
 - **防机器人**：按国内环境预留，优先接腾讯云验证码、阿里云验证码或极验。配置 `LEAD_CAPTCHA_REQUIRED=true` 后，线索和验证码接口都会先验证 token。
 - **字段安全**：relay 会限制关键字段长度、去除控制字符，并校验手机号和来源 URL。
-- **账号密码**：relay 用 scrypt 哈希保存密码；当前仍是内存账号仓库，接入真实数据库后需迁移到持久化用户表。
+- **账号密码**：relay 用 scrypt 哈希保存密码，账号与信任设备已持久化到 PostgreSQL。
 - **新设备验证**：注册必须输入验证码；登录先校验账号密码，若设备未信任，再要求短信或邮箱验证码。
-- **动态验证码**：手机号/邮箱验证码在 relay 内存中按 HMAC 存储，含 TTL、单次使用和最大尝试次数；dry-run 才会返回 `devCode`。
+- **动态验证码**：手机号/邮箱验证码优先存入 Redis，PostgreSQL 作为 fallback，含 TTL、单次使用和最大尝试次数；dry-run 才会返回 `devCode`。
 - **渠道超时**：飞书、企微、钉钉单通道默认 8 秒超时，避免单个渠道拖垮整体提交。
 - **渠道重试**：外部渠道失败会按配置进行短重试，降低偶发网络抖动影响。
 - **优雅退出**：监听 `SIGINT` / `SIGTERM`，便于容器或进程管理器平滑停止。
-- **数据库占位**：`relay/database.mjs` 只保留接口，等数据库真实启用后在该文件内接入即可。
+- **数据库持久化**：`relay/database.mjs` 封装 PostgreSQL 操作，`relay/redis.mjs` 封装 Redis 限流与验证码状态；`npm run db:init` 可初始化本地 schema 与种子数据。
 
 ## 字段映射
 
@@ -123,4 +127,4 @@ curl -X POST http://127.0.0.1:8787/api/admin/session \
   -d '{"email":"admin@jiuzhang.local","password":"AdminDemo123!"}'
 ```
 
-管理员会话 token 由 relay 使用 HMAC 签名，默认 8 小时过期。当前是 bootstrap 管理员配置，适合 MVP 阶段；正式上线应迁移到数据库管理员表，增加密码哈希、多管理员管理、禁用账号、操作审计和强制 MFA。
+管理员会话 token 由 relay 使用 HMAC 签名，默认 8 小时过期。bootstrap 管理员由 `npm run db:init` 写入 PostgreSQL；本地 dry-run 可使用演示密码，正式上线必须配置强 `ADMIN_BOOTSTRAP_PASSWORD`，后续再补多管理员管理、禁用账号和强制 MFA。

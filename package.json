@@ -6,6 +6,7 @@
     "dev": "next dev",
     "relay:dev": "node relay/lead-relay.mjs",
     "relay:check": "node --check relay/lead-relay.mjs",
+    "db:init": "node scripts/init-db.mjs",
     "verify:data": "node scripts/verify-data.mjs",
     "check:env": "node scripts/check-env.mjs",
     "smoke:routes": "node scripts/smoke-routes.mjs",
@@ -16,8 +17,10 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "ioredis": "^5.10.1",
     "lucide-react": "^0.561.0",
     "next": "^16.2.4",
+    "pg": "^8.20.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
@@ -26,6 +29,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.19.1",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.2",

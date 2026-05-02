@@ -199,5 +199,38 @@
 
 ---
 
+---
+
+## 9. Kimi 2.6 改动 — Redis + PostgreSQL 接入与持久化（2026-05-02）
+
+- **执行者**：Kimi 2.6
+- **状态**：已完成并通过验证
+- **处理原因**：用户要求接入本地 Redis 和 PostgreSQL，模拟真实运行环境，替代原有的内存存储方案。
+- **本批完成**：
+  1. **数据库初始化脚本**：新增 `scripts/init-db.mjs`，自动创建数据库（如果不存在），建表（providers、cases、leads、auth_accounts、auth_codes、admin_accounts、audit_logs），导入 JSON 数据，创建管理员账号。
+  2. **PostgreSQL 连接模块**：新增 `relay/db.mjs`，导出连接池 `pool`、参数化查询 `query()`、事务客户端 `getClient()`、优雅关闭 `closePool()`。
+  3. **Redis 连接模块**：新增 `relay/redis.mjs`，提供滑动窗口限流 `consumeRateLimitRedis()`、验证码存取 `setAuthCode/getAuthCode/deleteAuthCode`、发送冷却 `checkSendCooldown()`。
+  4. **数据库操作层重写**：`relay/database.mjs` 从占位函数重写为真实数据库操作，覆盖线索保存/更新/查询、验证码存取（Redis 优先 + PostgreSQL fallback）、账号认证、管理员查询、审计日志。
+  5. **Relay 核心逻辑重写**：`relay/lead-relay.mjs` 移除所有内存 `Map`，限流/验证码/冷却/账号全部切到 Redis/PostgreSQL；新增 `verifyCodeHash()` 修复验证码验证失败的 bug（签名比较需先生成 HMAC 再常量时间比对）。
+  6. **环境配置**：`.env.example` 和 `.env` 新增 `DATABASE_URL`、`REDIS_URL`，`LEAD_RELAY_SECRET` 随机生成。
+- **验证结果**：
+  1. Health check：PostgreSQL + Redis 均 connected。
+  2. 线索提交：数据存入 leads 表（id=1）。
+  3. 管理员登录：返回 JWT-style token，audit_logs 有记录。
+  4. 验证码请求：Redis 存储，dry-run 返回 devCode。
+  5. 用户注册：账号存入 auth_accounts。
+  6. 用户登录：信任设备自动识别。
+- **新增文件**：
+  - `scripts/init-db.mjs`
+  - `relay/db.mjs`
+  - `relay/redis.mjs`
+- **修改文件**：
+  - `relay/database.mjs` — 真实数据库操作
+  - `relay/lead-relay.mjs` — 移除内存存储，接入 Redis/PostgreSQL
+  - `.env.example` — 新增数据库连接配置
+  - `.env` — 本地环境配置
+
+---
+
 *修复完成时间：2026-05-02*  
 *Git 提交：`4c0b594`*

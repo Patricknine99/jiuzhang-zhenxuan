@@ -1,7 +1,11 @@
+import "../relay/env.mjs";
+
 const requiredForProduction = [
   "LEAD_RELAY_SECRET",
   "LEAD_ALLOWED_ORIGINS",
   "LEAD_CHANNELS",
+  "DATABASE_URL",
+  "REDIS_URL",
   "ADMIN_BOOTSTRAP_EMAIL",
   "ADMIN_BOOTSTRAP_PASSWORD",
   "ADMIN_BOOTSTRAP_ROLE"
@@ -33,8 +37,16 @@ if (process.env.LEAD_RELAY_DRY_RUN === "true") {
   console.warn("Warning: LEAD_RELAY_DRY_RUN=true. Production should set it to false.");
 }
 
+if (!process.env.LEAD_RELAY_SECRET || process.env.LEAD_RELAY_SECRET.length < 32 || process.env.LEAD_RELAY_SECRET.includes("replace-with")) {
+  missing.push("LEAD_RELAY_SECRET(non-default, >=32 chars)");
+}
+
 if (process.env.ADMIN_BOOTSTRAP_PASSWORD === "change-admin-password") {
   missing.push("ADMIN_BOOTSTRAP_PASSWORD(non-default)");
+}
+
+if (!process.env.ADMIN_BOOTSTRAP_PASSWORD || process.env.ADMIN_BOOTSTRAP_PASSWORD.includes("replace-with") || process.env.ADMIN_BOOTSTRAP_PASSWORD.length < 12) {
+  missing.push("ADMIN_BOOTSTRAP_PASSWORD(non-default, >=12 chars)");
 }
 
 if (process.env.LEAD_CAPTCHA_REQUIRED !== "true") {

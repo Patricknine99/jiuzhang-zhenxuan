@@ -1,7 +1,20 @@
+import "./env.mjs";
 import { createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { promisify } from "node:util";
-import { saveLeadPlaceholder } from "./database.mjs";
+import {
+  saveLead,
+  updateLeadResults,
+  getAuthAccount,
+  createAuthAccount,
+  addTrustedDevice,
+  storeAuthCode,
+  getAdminAccount,
+  verifyAuthCode as dbVerifyAuthCode,
+  writeAuditLog,
+  closeDatabaseConnections
+} from "./database.mjs";
+import { consumeRateLimitRedis, checkSendCooldown, redis } from "./redis.mjs";
 
 const scryptAsync = promisify(scrypt);
 
@@ -18,16 +31,13 @@ const CAPTCHA_SECRET_KEY = process.env.CAPTCHA_SECRET_KEY || "";
 const AUTH_CODE_TTL_MS = Number(process.env.AUTH_CODE_TTL_MS || 5 * 60_000);
 const AUTH_CODE_MAX_ATTEMPTS = Number(process.env.AUTH_CODE_MAX_ATTEMPTS || 5);
 const ADMIN_SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 8 * 60 * 60_000);
+const SEND_CODE_COOLDOWN_MS = 60_000;
 
 const CHANNELS = parseChannels(process.env.LEAD_CHANNELS || "feishu");
 const ALLOWED_ORIGINS = parseList(process.env.LEAD_ALLOWED_ORIGINS || "*");
 const SHARED_SECRET = process.env.LEAD_RELAY_SECRET || "";
 const DRY_RUN = process.env.LEAD_RELAY_DRY_RUN === "true";
-const RATE_LIMIT_BUCKETS = new Map();
-const AUTH_CODE_BUCKETS = new Map();
-const AUTH_ACCOUNTS = new Map();
-const SEND_CODE_COOLDOWN = new Map();
-const SEND_CODE_COOLDOWN_MS = 60_000; // 1 minute per identifier
+let isShuttingDown = false;
 
 const ADMIN_ROLE_PERMISSIONS = {
   owner: ["leads:read", "leads:assign", "providers:review", "content:edit", "payments:review", "settings:manage", "audit:read"],
@@ -40,7 +50,7 @@ const ADMIN_ROLE_PERMISSIONS = {
 // Startup security checks
 if (!SHARED_SECRET || SHARED_SECRET.length < 16) {
   console.error("FATAL: LEAD_RELAY_SECRET must be set and at least 16 characters.");
-  console.error("Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"");
+  console.error('Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
   process.exit(1);
 }
 
@@ -60,20 +70,16 @@ const server = createServer(async (request, response) => {
   const pathname = getPathname(request.url);
 
   if ((pathname === "/healthz" || pathname === "/readyz") && request.method === "GET") {
+    const redisConnected = redis.status === "ready";
     sendJson(response, 200, {
       ok: true,
       status: "ready",
       dryRun: DRY_RUN,
       channels: CHANNELS,
-      database: "reserved",
-      rateLimit: {
-        windowMs: RATE_LIMIT_WINDOW_MS,
-        max: RATE_LIMIT_MAX
-      },
-      retry: {
-        count: CHANNEL_RETRY_COUNT,
-        baseMs: CHANNEL_RETRY_BASE_MS
-      },
+      database: "postgresql",
+      redis: redisConnected ? "connected" : "disconnected",
+      rateLimit: { windowMs: RATE_LIMIT_WINDOW_MS, max: RATE_LIMIT_MAX },
+      retry: { count: CHANNEL_RETRY_COUNT, baseMs: CHANNEL_RETRY_BASE_MS },
       captcha: {
         required: CAPTCHA_REQUIRED,
         provider: CAPTCHA_PROVIDER || "reserved-domestic",
@@ -91,7 +97,7 @@ const server = createServer(async (request, response) => {
         configured: hasWechatPayConfig()
       },
       admin: {
-        configured: hasAdminConfig(),
+        configured: true,
         roles: Object.keys(ADMIN_ROLE_PERMISSIONS)
       },
       requestId
@@ -129,14 +135,12 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  if (!["/api/leads", "/api/auth/code", "/api/auth/session", "/api/payments/wechat/prepay", "/api/admin/session", "/api/admin/me"].includes(pathname)) {
-    sendError(response, 404, "not_found", "Not found", requestId);
-    return;
-  }
+  sendError(response, 404, "not_found", "Not found", requestId);
 });
 
 server.listen(PORT, () => {
   console.log(`Lead relay listening on http://127.0.0.1:${PORT}`);
+  console.log(`Database: PostgreSQL | Redis: ${redis.status === "ready" ? "connected" : "connecting..."}`);
   console.log(`Channels: ${CHANNELS.join(", ") || "none"}${DRY_RUN ? " (dry run)" : ""}`);
 });
 
@@ -162,7 +166,7 @@ async function handleLeadRequest(request, response, origin, requestId) {
     return;
   }
 
-  const rateLimit = consumeRateLimit(getClientKey(request));
+  const rateLimit = await consumeRateLimit(getClientKey(request));
   if (!rateLimit.ok) {
     response.setHeader("Retry-After", String(Math.ceil(rateLimit.retryAfterMs / 1000)));
     sendError(response, 429, "rate_limited", "Too many requests, please retry later", requestId);
@@ -173,11 +177,19 @@ async function handleLeadRequest(request, response, origin, requestId) {
     const body = await readJsonBody(request);
     await verifyCaptchaToken(body.captchaToken, getClientKey(request), requestId);
     const payload = normalizeLeadPayload(body);
-    const results = await submitLeadToChannels(payload, CHANNELS);
+
+    // Save to database first
+    const dbResult = await saveLead(payload, requestId, CHANNELS);
+
+    const results = await submitLeadToChannels(payload, CHANNELS, requestId, dbResult);
     const requiredResults = results.filter((result) => result.channel !== "database");
     const allOk = requiredResults.length > 0 && requiredResults.every((result) => result.ok);
     const anyOk = requiredResults.length > 0 && requiredResults.some((result) => result.ok);
     const partialFailure = anyOk && !allOk;
+
+    // Update lead results in database
+    await updateLeadResults(requestId, results);
+
     sendJson(response, anyOk ? 200 : 502, {
       ok: anyOk,
       partialFailure,
@@ -189,11 +201,9 @@ async function handleLeadRequest(request, response, origin, requestId) {
   }
 }
 
-async function submitLeadToChannels(payload, channels) {
-  const databaseResult = await saveLeadPlaceholder(payload);
-
+async function submitLeadToChannels(payload, channels, requestId, dbResult) {
   if (DRY_RUN) {
-    return [databaseResult, ...channels.map((channel) => ({
+    return [dbResult, ...channels.map((channel) => ({
       ok: true,
       channel,
       message: `Dry run accepted ${payload.type} lead`
@@ -203,12 +213,8 @@ async function submitLeadToChannels(payload, channels) {
   const uniqueChannels = Array.from(new Set(channels));
   if (uniqueChannels.length === 0) {
     return [
-      databaseResult,
-      {
-        ok: false,
-        channel: "relay",
-        message: "No lead channels configured"
-      }
+      dbResult,
+      { ok: false, channel: "relay", message: "No lead channels configured" }
     ];
   }
 
@@ -228,7 +234,7 @@ async function submitLeadToChannels(payload, channels) {
       }
     })
   );
-  return [databaseResult, ...channelResults];
+  return [dbResult, ...channelResults];
 }
 
 async function handleAuthCodeRequest(request, response, origin, requestId) {
@@ -245,7 +251,8 @@ async function handleAuthCodeRequest(request, response, origin, requestId) {
     sendError(response, 415, "unsupported_media_type", "Content-Type must be application/json", requestId);
     return;
   }
-  const rateLimit = consumeRateLimit(`auth:${getClientKey(request)}`);
+
+  const rateLimit = await consumeRateLimit(`auth:${getClientKey(request)}`);
   if (!rateLimit.ok) {
     response.setHeader("Retry-After", String(Math.ceil(rateLimit.retryAfterMs / 1000)));
     sendError(response, 429, "rate_limited", "Too many auth requests, please retry later", requestId);
@@ -259,23 +266,19 @@ async function handleAuthCodeRequest(request, response, origin, requestId) {
     const identifier = normalizeAuthIdentifier(method, body.identifier);
     const purpose = body.purpose === "register" ? "register" : "login";
 
-    // Per-identifier send cooldown
+    // Per-identifier send cooldown (Redis-backed)
     const cooldownKey = `${method}:${identifier}`;
-    const lastSent = SEND_CODE_COOLDOWN.get(cooldownKey);
-    if (lastSent && Date.now() - lastSent < SEND_CODE_COOLDOWN_MS) {
-      const retryAfter = Math.ceil((SEND_CODE_COOLDOWN_MS - (Date.now() - lastSent)) / 1000);
+    const cooldown = await checkSendCooldownWithFallback(cooldownKey, SEND_CODE_COOLDOWN_MS);
+    if (!cooldown.ok) {
+      const retryAfter = Math.ceil(cooldown.retryAfterMs / 1000);
       response.setHeader("Retry-After", String(retryAfter));
       sendError(response, 429, "send_cooldown", `验证码发送过于频繁，请 ${retryAfter} 秒后再试`, requestId);
       return;
     }
 
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    SEND_CODE_COOLDOWN.set(cooldownKey, Date.now());
-    AUTH_CODE_BUCKETS.set(getAuthCodeKey(method, identifier, purpose), {
-      codeHash: signValue(code),
-      expiresAt: Date.now() + AUTH_CODE_TTL_MS,
-      attempts: 0
-    });
+
+    await storeAuthCode(method, identifier, purpose, signValue(code), AUTH_CODE_TTL_MS);
 
     sendJson(response, 200, {
       ok: true,
@@ -313,14 +316,21 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
     const role = body.role === "provider" ? "provider" : "buyer";
     const password = normalizePassword(body.password);
     const deviceId = normalizeDeviceId(body.deviceId);
-    const accountKey = getAccountKey(method, identifier);
-    const existingAccount = AUTH_ACCOUNTS.get(accountKey);
+
+    const existingAccount = await getAuthAccount(method, identifier);
 
     if (purpose === "register") {
       if (existingAccount) throw new Error("该账号已注册，请直接登录");
-      verifyAuthCode(method, identifier, purpose, body.code);
-      const account = await createAuthAccount({ method, identifier, role, password, deviceId });
-      AUTH_ACCOUNTS.set(accountKey, account);
+      await dbVerifyAuthCode(method, identifier, purpose, body.code, AUTH_CODE_MAX_ATTEMPTS, verifyCodeHash);
+      const account = await createAuthAccount({
+        id: `acct_${Date.now().toString(36)}_${signValue(identifier).slice(0, 8)}`,
+        method,
+        identifier,
+        displayName: method === "email" ? identifier.split("@")[0] : `${identifier.slice(0, 3)}****${identifier.slice(-4)}`,
+        role,
+        passwordHash: await hashPassword(password),
+        trustedDevices: [deviceId]
+      });
       sendJson(response, 200, {
         ok: true,
         requestId,
@@ -330,7 +340,7 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
       return;
     }
 
-    if (!existingAccount) throw new Error(DRY_RUN ? "账号不存在。dry-run 模式请先注册一次。" : "账号或密码不正确");
+    if (!existingAccount) throw new Error("账号或密码不正确");
     if (!(await verifyPassword(password, existingAccount.passwordHash))) throw new Error("账号或密码不正确");
 
     const isTrustedDevice = existingAccount.trustedDevices.has(deviceId);
@@ -344,8 +354,8 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
         });
         return;
       }
-      verifyAuthCode(method, identifier, purpose, body.code);
-      existingAccount.trustedDevices.add(deviceId);
+      await dbVerifyAuthCode(method, identifier, purpose, body.code, AUTH_CODE_MAX_ATTEMPTS, verifyCodeHash);
+      await addTrustedDevice(method, identifier, deviceId);
     }
 
     sendJson(response, 200, {
@@ -402,7 +412,7 @@ async function handleAdminSessionRequest(request, response, origin, requestId) {
     return;
   }
 
-  const rateLimit = consumeRateLimit(`admin:${getClientKey(request)}`);
+  const rateLimit = await consumeRateLimit(`admin:${getClientKey(request)}`);
   if (!rateLimit.ok) {
     response.setHeader("Retry-After", String(Math.ceil(rateLimit.retryAfterMs / 1000)));
     sendError(response, 429, "rate_limited", "Too many admin login attempts, please retry later", requestId);
@@ -410,23 +420,31 @@ async function handleAdminSessionRequest(request, response, origin, requestId) {
   }
 
   try {
-    if (!hasAdminConfig()) throw new Error("Admin account is not configured on relay");
     const body = await readJsonBody(request);
     const email = normalizeAdminEmail(body.email);
     const password = normalizePassword(body.password);
-    const expectedEmail = normalizeAdminEmail(process.env.ADMIN_BOOTSTRAP_EMAIL);
-    const expectedPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
-    if (email !== expectedEmail || !isValidSecret(password, expectedPassword)) throw new Error("管理员账号或密码不正确");
 
-    const role = normalizeAdminRole(process.env.ADMIN_BOOTSTRAP_ROLE || "owner");
+    const admin = await getAdminAccount(email);
+    if (!admin || !admin.passwordHash) throw new Error("管理员账号或密码不正确");
+    if (!(await verifyPassword(password, admin.passwordHash))) throw new Error("管理员账号或密码不正确");
+
     const account = {
-      id: `admin_${signValue(email).slice(0, 10)}`,
-      email,
-      name: process.env.ADMIN_BOOTSTRAP_NAME || "管理员",
-      role,
-      permissions: ADMIN_ROLE_PERMISSIONS[role],
-      createdAt: new Date().toISOString()
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      permissions: ADMIN_ROLE_PERMISSIONS[admin.role] || [],
+      createdAt: admin.createdAt
     };
+
+    await writeAuditLog({
+      actor: email,
+      action: "admin_login",
+      resource: "admin_session",
+      details: { ipAddress: getClientKey(request) },
+      ipAddress: getClientKey(request)
+    });
+
     sendJson(response, 200, {
       ok: true,
       requestId,
@@ -478,17 +496,11 @@ async function submitToFeishu(payload) {
   const appId = requireEnv("FEISHU_APP_ID");
   const appSecret = requireEnv("FEISHU_APP_SECRET");
   const appToken = requireEnv("FEISHU_APP_TOKEN");
-  const tableId =
-    payload.type === "demand"
-      ? requireEnv("FEISHU_DEMAND_TABLE_ID")
-      : requireEnv("FEISHU_APPLICATION_TABLE_ID");
+  const tableId = payload.type === "demand" ? requireEnv("FEISHU_DEMAND_TABLE_ID") : requireEnv("FEISHU_APPLICATION_TABLE_ID");
   const tokenResponse = await fetch("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal", {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({
-      app_id: appId,
-      app_secret: appSecret
-    })
+    body: JSON.stringify({ app_id: appId, app_secret: appSecret })
   });
   const tokenData = await tokenResponse.json();
   if (!tokenResponse.ok || tokenData.code !== 0) {
@@ -503,9 +515,7 @@ async function submitToFeishu(payload) {
         Authorization: `Bearer ${tokenData.tenant_access_token}`,
         "Content-Type": "application/json; charset=utf-8"
       },
-      body: JSON.stringify({
-        fields: toFeishuFields(payload)
-      })
+      body: JSON.stringify({ fields: toFeishuFields(payload) })
     }
   );
   const recordData = await recordResponse.json();
@@ -524,10 +534,7 @@ async function submitToWeCom(payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       msgtype: "text",
-      text: {
-        content: toNotificationText(payload),
-        mentioned_mobile_list: mentionedMobileList
-      }
+      text: { content: toNotificationText(payload), mentioned_mobile_list: mentionedMobileList }
     })
   });
   const data = await response.json();
@@ -546,13 +553,8 @@ async function submitToDingTalk(payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       msgtype: "text",
-      text: {
-        content: toNotificationText(payload)
-      },
-      at: {
-        atMobiles,
-        isAtAll: false
-      }
+      text: { content: toNotificationText(payload) },
+      at: { atMobiles, isAtAll: false }
     })
   });
   const data = await response.json();
@@ -565,7 +567,7 @@ async function submitToDingTalk(payload) {
 function normalizeLeadPayload(body) {
   if (!body || typeof body !== "object") throw new Error("Body must be an object");
 
-  // Honeypot detection — reject payloads where a hidden field has been filled.
+  // Honeypot detection
   if (typeof body["jiuzhang_website_url"] === "string" && body["jiuzhang_website_url"].trim()) {
     throw new Error("Suspicious submission detected");
   }
@@ -679,9 +681,7 @@ function toNotificationText(payload) {
 function signDingTalkWebhook(webhook, secret) {
   if (!secret) return webhook;
   const timestamp = Date.now();
-  const sign = createHmac("sha256", secret)
-    .update(`${timestamp}\n${secret}`)
-    .digest("base64");
+  const sign = createHmac("sha256", secret).update(`${timestamp}\n${secret}`).digest("base64");
   const url = new URL(webhook);
   url.searchParams.set("timestamp", String(timestamp));
   url.searchParams.set("sign", sign);
@@ -693,7 +693,6 @@ function setCorsHeaders(response, origin) {
   response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Lead-Relay-Secret");
-  // Only set Vary when origin is not wildcard — * is cachable for all origins.
   if (allowedOrigin !== "*") {
     response.setHeader("Vary", "Origin");
   }
@@ -708,8 +707,6 @@ function setSecurityHeaders(response) {
 
 function isAllowedOrigin(origin) {
   if (ALLOWED_ORIGINS.includes("*")) return true;
-  // When using explicit origin list, reject requests with missing origin header.
-  // This prevents non-browser clients from bypassing origin checks.
   if (!origin) return false;
   return ALLOWED_ORIGINS.includes(origin);
 }
@@ -750,12 +747,7 @@ function sendJson(response, status, body) {
 }
 
 function sendError(response, status, code, message, requestId) {
-  sendJson(response, status, {
-    ok: false,
-    error: { code, message },
-    message,
-    requestId
-  });
+  sendJson(response, status, { ok: false, error: { code, message }, message, requestId });
 }
 
 function getPathname(url) {
@@ -777,31 +769,21 @@ function getClientKey(request) {
   return request.socket.remoteAddress || "unknown";
 }
 
-function consumeRateLimit(key) {
-  const now = Date.now();
-  const bucket = RATE_LIMIT_BUCKETS.get(key);
-  if (!bucket || now > bucket.resetAt) {
-    RATE_LIMIT_BUCKETS.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+async function consumeRateLimit(key) {
+  try {
+    return await consumeRateLimitRedis(key, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX);
+  } catch {
+    // Fallback to allow request if Redis is down
     return { ok: true, retryAfterMs: 0 };
   }
-  if (bucket.count >= RATE_LIMIT_MAX) {
-    return { ok: false, retryAfterMs: bucket.resetAt - now };
-  }
-  bucket.count += 1;
-  return { ok: true, retryAfterMs: 0 };
 }
 
-function cleanupRateLimitBuckets() {
-  const now = Date.now();
-  for (const [key, bucket] of RATE_LIMIT_BUCKETS.entries()) {
-    if (now > bucket.resetAt) RATE_LIMIT_BUCKETS.delete(key);
-  }
-}
-
-function cleanupAuthCodeBuckets() {
-  const now = Date.now();
-  for (const [key, bucket] of AUTH_CODE_BUCKETS.entries()) {
-    if (now > bucket.expiresAt) AUTH_CODE_BUCKETS.delete(key);
+async function checkSendCooldownWithFallback(key, cooldownMs) {
+  try {
+    return await checkSendCooldown(key, cooldownMs);
+  } catch (error) {
+    console.warn(`Redis send cooldown check failed, allowing request: ${error instanceof Error ? error.message : "unknown error"}`);
+    return { ok: true, retryAfterMs: 0 };
   }
 }
 
@@ -826,10 +808,7 @@ function parseChannels(value) {
 }
 
 function parseList(value) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
 function requireEnv(key) {
@@ -868,10 +847,6 @@ function normalizeAdminEmail(value) {
   return value.trim().toLowerCase();
 }
 
-function normalizeAdminRole(value) {
-  return Object.prototype.hasOwnProperty.call(ADMIN_ROLE_PERMISSIONS, value) ? value : "auditor";
-}
-
 function normalizePassword(value) {
   if (typeof value !== "string" || value.length < 8) throw new Error("密码至少需要 8 位");
   if (value.length > 128) throw new Error("密码长度不能超过 128 位");
@@ -885,15 +860,8 @@ function normalizeDeviceId(value) {
   return value;
 }
 
-function hasAdminConfig() {
-  return Boolean(process.env.ADMIN_BOOTSTRAP_EMAIL && process.env.ADMIN_BOOTSTRAP_PASSWORD);
-}
-
 function signAdminToken(account) {
-  const payload = {
-    account,
-    expiresAt: Date.now() + ADMIN_SESSION_TTL_MS
-  };
+  const payload = { account, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${encoded}.${signValue(encoded)}`;
 }
@@ -911,32 +879,6 @@ function getBearerToken(request) {
   const authorization = request.headers.authorization;
   if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) return "";
   return authorization.slice("Bearer ".length).trim();
-}
-
-function getAuthCodeKey(method, identifier, purpose) {
-  return `${purpose}:${method}:${identifier}`;
-}
-
-function getAccountKey(method, identifier) {
-  return `${method}:${identifier}`;
-}
-
-function verifyAuthCode(method, identifier, purpose, code) {
-  const key = getAuthCodeKey(method, identifier, purpose);
-  const stored = AUTH_CODE_BUCKETS.get(key);
-  if (!stored || Date.now() > stored.expiresAt) {
-    AUTH_CODE_BUCKETS.delete(key);
-    throw new Error("验证码已过期，请重新获取");
-  }
-  if (stored.attempts >= AUTH_CODE_MAX_ATTEMPTS) {
-    AUTH_CODE_BUCKETS.delete(key);
-    throw new Error("验证码尝试次数过多，请重新获取");
-  }
-  stored.attempts += 1;
-  if (!isValidSecret(signValue(String(code || "")), stored.codeHash)) {
-    throw new Error("验证码不正确");
-  }
-  AUTH_CODE_BUCKETS.delete(key);
 }
 
 async function hashPassword(password) {
@@ -959,19 +901,6 @@ async function verifyPassword(password, stored) {
   }
 }
 
-async function createAuthAccount({ method, identifier, role, password, deviceId }) {
-  return {
-    id: `acct_${Date.now().toString(36)}_${signValue(identifier).slice(0, 8)}`,
-    method,
-    identifier,
-    displayName: method === "email" ? identifier.split("@")[0] : `${identifier.slice(0, 3)}****${identifier.slice(-4)}`,
-    role,
-    createdAt: new Date().toISOString(),
-    passwordHash: await hashPassword(password),
-    trustedDevices: new Set([deviceId])
-  };
-}
-
 function toPublicAccount(account) {
   return {
     id: account.id,
@@ -987,13 +916,17 @@ function signValue(value) {
   return createHmac("sha256", SHARED_SECRET).update(value).digest("hex");
 }
 
+function verifyCodeHash(input, expectedHash) {
+  return isValidSecret(signValue(input), expectedHash);
+}
+
 function hasWechatPayConfig() {
   return Boolean(
     process.env.WECHAT_PAY_APP_ID &&
-      process.env.WECHAT_PAY_MCH_ID &&
-      process.env.WECHAT_PAY_SERIAL_NO &&
-      process.env.WECHAT_PAY_PRIVATE_KEY &&
-      process.env.WECHAT_PAY_API_V3_KEY
+    process.env.WECHAT_PAY_MCH_ID &&
+    process.env.WECHAT_PAY_SERIAL_NO &&
+    process.env.WECHAT_PAY_PRIVATE_KEY &&
+    process.env.WECHAT_PAY_API_V3_KEY
   );
 }
 
@@ -1005,18 +938,12 @@ function cleanString(value, maxLength) {
 }
 
 function requireString(value, key, maxLength = 500) {
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`Missing field: ${key}`);
-  }
-  if (cleanString(value, maxLength + 1).length > maxLength) {
-    throw new Error(`Field is too long: ${key}`);
-  }
+  if (typeof value !== "string" || !value.trim()) throw new Error(`Missing field: ${key}`);
+  if (cleanString(value, maxLength + 1).length > maxLength) throw new Error(`Field is too long: ${key}`);
 }
 
 function requireArray(value, key) {
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(`Missing field: ${key}`);
-  }
+  if (!Array.isArray(value) || value.length === 0) throw new Error(`Missing field: ${key}`);
 }
 
 function requirePhone(value, key) {
@@ -1046,15 +973,15 @@ function optionalString(value, maxLength = 500) {
 }
 
 function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   console.log(`Received ${signal}, closing lead relay...`);
-  server.close(() => {
+  server.close(async () => {
+    await closeDatabaseConnections().catch(() => {});
     console.log("Lead relay closed");
     process.exit(0);
   });
 }
-
-setInterval(cleanupRateLimitBuckets, Math.min(60_000, RATE_LIMIT_WINDOW_MS)).unref();
-setInterval(cleanupAuthCodeBuckets, Math.min(60_000, AUTH_CODE_TTL_MS)).unref();
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

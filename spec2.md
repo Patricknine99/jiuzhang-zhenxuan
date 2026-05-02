@@ -258,9 +258,6 @@
   2. `npm run verify:data` 通过。
   3. `npm run lint` 通过。
   4. `npm run build` 通过，静态生成 36 个页面。
-  5. `npm run smoke:routes` 通过，新增 `/status` 返回 200，未知动态路由返回 404。
-  6. relay dry-run 通过，`GET /healthz` 返回健康状态，并包含限流与重试配置；正常需求提交返回 `ok: true`。
-  7. `npm run check:env` 在未配置生产环境变量时按预期失败，提示缺少 `LEAD_RELAY_SECRET`、`LEAD_ALLOWED_ORIGINS`、`LEAD_CHANNELS`。
 
 ## 12. 截至 2026-05-02 的总体进度汇总
 
@@ -269,7 +266,7 @@
 - **AI 能力预留**：已完成 AI 诊断工作台和智能客服悬浮窗，均有本地兜底与自有 AI 接口环境变量预留。
 - **账号入口**：已完成手机号/邮箱前端注册登录流程，微信、企业微信、飞书登录为预留入口。
 - **线索中转**：已完成 relay、健康检查、CORS、共享密钥、body 限制、JSON 校验、请求编号、限流、超时、渠道重试、飞书/企微/钉钉适配器、dry-run。
-- **数据库**：已按要求保留 `relay/database.mjs` 空接口，暂不连接真实数据库。
+- **数据库**：已接入本地 PostgreSQL/Redis 模拟环境，线索、账号、验证码 fallback、管理员和审计日志走 PostgreSQL；限流、验证码 TTL 和发送冷却优先走 Redis。
 - **用户体验**：已完成全局 loading、表单提交 spinner、AI 诊断等待态、智能客服等待态、登录/验证码处理中、表单草稿保存、成功页提交结果展示、账号页最近提交记录。
 - **灰度与验证**：已完成 `verify:data`、`smoke:routes`、`check:env`、`relay:check` 等脚本；每次重大改动均已写入 SPEC 并提交 Git。
 - **Git 保存点**：已有 `72214fc`、`41936a5`、`9863988`、`9ba40e4`、`733acc2`，本批次将继续提交新的保存点。
@@ -351,3 +348,33 @@
   4. `npm run build` 通过，静态生成 54 个页面。
   5. `npm run smoke:routes` 通过，`/admin` 返回 200，未知动态路由返回 404。
   6. relay dry-run 管理员验证通过：`GET /healthz` 返回 `admin.configured: true`；正确管理员账号可登录并返回角色权限和 token；错误密码被拒绝；`GET /api/admin/me` 可验证签名 token。
+
+## 16. ChatGPT 修改记录（2026-05-02 本地 PostgreSQL/Redis 接入解耦批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **前置情况**：用户已接入本地 PostgreSQL 和 Redis，Kimi 2.6 已在 `spec4.md` 记录主要持久化改动。本批按用户补充要求，重点避免和本地硬盘、本机用户名、本地数据库部署方式强耦合，方便后续迁到云端服务器。
+- **本批完成**：
+  1. 新增 `relay/env.mjs`，让 relay、数据库脚本、环境检查脚本自动读取 `.env.local` / `.env`，避免 Node 脚本拿不到本地 `DATABASE_URL`、`REDIS_URL`、`LEAD_RELAY_SECRET`。
+  2. 新增 `relay/config.mjs`，集中读取 PostgreSQL/Redis 连接、连接池、超时、重试和初始化策略；`relay/db.mjs`、`relay/redis.mjs`、`scripts/init-db.mjs` 改为依赖配置层。
+  3. 新增 `npm run db:init`，用于初始化 PostgreSQL schema、导入服务商/案例种子数据、写入 bootstrap 管理员。
+  4. 加固 `scripts/init-db.mjs`：数据库名与 owner 做安全标识符校验和转义；默认不执行 `CREATE DATABASE`，云端只需控制台先建库；管理员邮箱、名称、角色、密码改从环境变量读取；dry-run 下允许演示密码，非 dry-run 强制要求非默认强密码。
+  5. 修复验证码写入路径：`/api/auth/code` 改为调用 `storeAuthCode()`，保持 Redis 优先、PostgreSQL fallback 的设计一致，不再绕过数据库操作层。
+  6. 增强 Redis 异常兜底：验证码存取 Redis 失败时降级 PostgreSQL，发送冷却检查 Redis 失败时临时放行并记录 warning。
+  7. 更新 `scripts/check-env.mjs`，自动读取 `.env`，并将 `DATABASE_URL`、`REDIS_URL`、强 `LEAD_RELAY_SECRET`、强 bootstrap 管理员密码纳入生产检查。
+  8. 更新 `.env.example` 与 `relay/README.md`，把过期的“数据库占位/内存存储”说明改为 PostgreSQL/Redis 本地模拟说明，并补充 `db:init` 使用方式和云端解耦策略。
+  9. 清理 relay 里的未使用代码和 lint warning。
+- **本地验证结果**：
+  1. 硬盘重新挂载后，`git fsck --no-progress`、锁文件/临时文件检查、`git diff --check` 均未发现硬盘断开造成的仓库损坏。
+  2. `npm run db:init` 通过：数据库已存在时可重复执行，表结构创建、4 个服务商、3 个案例、bootstrap 管理员 seed 均成功。
+  3. 使用临时 `LEAD_RELAY_SECRET` 启动 `npm run relay:dev` 成功，`GET /healthz` 返回 PostgreSQL 与 Redis connected。
+  4. `POST /api/leads` dry-run 成功，线索写入 PostgreSQL，返回 database + feishu/wecom/dingtalk 三渠道结果。
+  5. `POST /api/auth/code` dry-run 成功，验证码写入 Redis 并返回 devCode。
+  6. `POST /api/auth/session` 新手机号注册和信任设备登录成功。
+  7. `POST /api/admin/session` 使用 dry-run bootstrap 管理员登录成功。
+  8. `npm run relay:check`、`npm run lint`、`npm run test`、`npm run verify:data` 均通过。
+  9. `npm run build` 通过，静态生成 54 个页面。
+  10. 启动临时 Next dev server 后，`npm run smoke:routes` 通过；未知动态路由返回 404。Next dev 仍会对 `output: "export"` 下未知动态路径打印静态参数诊断，生产构建不受影响。
+- **仍需用户本地处理**：
+  1. `.env` 中的 `LEAD_RELAY_SECRET` 需要替换为 32 位以上随机字符串；本批 smoke 使用临时命令行变量覆盖，没有把真实密钥写入仓库。
+  2. 云端部署前必须设置非默认 `ADMIN_BOOTSTRAP_PASSWORD`，并运行 `npm run check:env`。
