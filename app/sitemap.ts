@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getCases, getProviders } from "@/lib/data";
 import { industryCategories, serviceCategories } from "@/lib/catalog";
 
-const baseUrl = "https://jiuzhang-zhenxuan.example.com";
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://jiuzhang-zhenxuan.com";
 
 export const dynamic = "force-static";
 

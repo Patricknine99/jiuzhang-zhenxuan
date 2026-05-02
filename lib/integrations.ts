@@ -71,35 +71,9 @@ export async function submitLeadToChannels(
   }));
 }
 
-export function toNotificationText(payload: LeadPayload) {
-  if (payload.type === "demand") {
-    return [
-      "新的企业 AI 需求",
-      `公司：${payload.company}`,
-      `联系人：${payload.contactName}`,
-      `行业：${payload.industry}`,
-      `预算：${payload.budgetRange}`,
-      `期望交付：${payload.expectedDelivery}`,
-      `需要推荐：${payload.needRecommend ? "是" : "否"}`,
-      `手机号：${payload.phone || "未填写"}`,
-      `微信号：${payload.wechat || "未填写"}`,
-      `咨询上下文：${payload.context || "未带入"}`,
-      `业务痛点：${payload.painPoint}`
-    ].join("\n");
-  }
+// toNotificationText has been removed — the canonical implementation lives in relay/lead-relay.mjs.
+// Avoid maintaining duplicate notification templates across frontend and backend.
 
-  return [
-    "新的服务商入驻申请",
-    `团队/个人：${payload.teamName}`,
-    `擅长方向：${payload.direction.join("、")}`,
-    `预算区间：${payload.budgetRange}`,
-    `可开票：${payload.canInvoice ? "是" : "否"}`,
-    `手机号：${payload.contactPhone}`,
-    `微信号：${payload.contactWechat || "未填写"}`,
-    `技术栈：${payload.techStack}`,
-    `案例链接：${payload.caseLinks}`
-  ].join("\n");
-}
 
 export function getTargetChannelsFromEnv(value?: string): LeadChannel[] {
   if (!value) return ["feishu"];

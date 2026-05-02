@@ -10,7 +10,7 @@ export function Footer() {
               甄
             </span>
             <span className="font-serif font-bold">九章甄选</span>
-            <span className="text-sm text-stone-400">© 2026</span>
+            <span className="text-sm text-stone-400">© {new Date().getFullYear()}</span>
           </Link>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-stone-500">
             <Link href="/provider-agreement" className="hover:text-stone-950">

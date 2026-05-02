@@ -88,8 +88,15 @@ const server = createServer(async (request, response) => {
     const payload = normalizeLeadPayload(body);
     const results = await submitLeadToChannels(payload, CHANNELS);
     const requiredResults = results.filter((result) => result.channel !== "database");
-    const ok = requiredResults.length > 0 && requiredResults.some((result) => result.ok);
-    sendJson(response, ok ? 200 : 502, { ok, results, requestId });
+    const allOk = requiredResults.length > 0 && requiredResults.every((result) => result.ok);
+    const anyOk = requiredResults.length > 0 && requiredResults.some((result) => result.ok);
+    const partialFailure = anyOk && !allOk;
+    sendJson(response, anyOk ? 200 : 502, {
+      ok: anyOk,
+      partialFailure,
+      results,
+      requestId
+    });
   } catch (error) {
     sendError(response, 400, "bad_request", error instanceof Error ? error.message : "Invalid request", requestId);
   }
@@ -372,12 +379,17 @@ function setCorsHeaders(response, origin) {
   response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Lead-Relay-Secret");
-  response.setHeader("Vary", "Origin");
+  // Only set Vary when origin is not wildcard — * is cachable for all origins.
+  if (allowedOrigin !== "*") {
+    response.setHeader("Vary", "Origin");
+  }
 }
 
 function isAllowedOrigin(origin) {
   if (ALLOWED_ORIGINS.includes("*")) return true;
-  if (!origin) return true;
+  // When using explicit origin list, reject requests with missing origin header.
+  // This prevents non-browser clients from bypassing origin checks.
+  if (!origin) return false;
   return ALLOWED_ORIGINS.includes(origin);
 }
 
@@ -522,7 +534,7 @@ function shutdown(signal) {
   });
 }
 
-setInterval(cleanupRateLimitBuckets, Math.max(60_000, RATE_LIMIT_WINDOW_MS)).unref();
+setInterval(cleanupRateLimitBuckets, Math.min(60_000, RATE_LIMIT_WINDOW_MS)).unref();
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

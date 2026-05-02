@@ -3,11 +3,13 @@ import { ArrowRight, BadgeCheck, ClipboardCheck, Search, ShieldCheck, Sparkles, 
 import { CaseCardDark } from "@/components/shared/CaseCardDark";
 import { ProviderCard } from "@/components/shared/ProviderCard";
 import { SectionHeading } from "@/components/shared/SectionHeading";
-import { getFeaturedCases, getFeaturedProviders } from "@/lib/data";
+import { getFeaturedCases, getFeaturedProviders, getProviders } from "@/lib/data";
 
 export default function HomePage() {
   const providers = getFeaturedProviders();
   const cases = getFeaturedCases();
+  const allProviders = getProviders();
+  const totalProjects = allProviders.reduce((sum, p) => sum + p.caseCount, 0);
 
   return (
     <>
@@ -47,10 +49,10 @@ export default function HomePage() {
         </div>
         <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-stone-500">
           <span>
-            已交付 <strong className="text-stone-950">27</strong> 个商业项目
+            已交付 <strong className="text-stone-950">{totalProjects}</strong> 个商业项目
           </span>
           <span>
-            企业选型耗时 <strong className="text-stone-950">-60%</strong>
+            精选服务商 <strong className="text-stone-950">{allProviders.length}</strong> 家
           </span>
           <span>
             资金纠纷 <strong className="text-stone-950">0 起</strong>

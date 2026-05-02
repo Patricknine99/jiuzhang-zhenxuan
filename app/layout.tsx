@@ -17,8 +17,10 @@ const serif = Noto_Serif_SC({
   weight: ["400", "600", "700", "900"]
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://jiuzhang-zhenxuan.com";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://jiuzhang-zhenxuan.example.com"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "九章甄选 — AI 商业服务的严选平台",
     template: "%s | 九章甄选"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integrations";
@@ -35,9 +35,21 @@ export function StaticForm({
   const [error, setError] = useState("");
   const [requestId, setRequestId] = useState("");
   const draftKey = `jiuzhang:${leadType}:draft`;
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const debouncedSaveDraft = useCallback(
+    (form: HTMLFormElement) => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = setTimeout(() => saveDraft(form, draftKey), 600);
+    },
+    [draftKey]
+  );
 
   useEffect(() => {
     restoreDraft(formRef.current, draftKey);
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
   }, [draftKey]);
 
   return (
@@ -45,7 +57,7 @@ export function StaticForm({
       ref={formRef}
       className="space-y-5"
       onChange={(event) => {
-        saveDraft(event.currentTarget, draftKey);
+        debouncedSaveDraft(event.currentTarget);
       }}
       onSubmit={async (event) => {
         event.preventDefault();
@@ -155,12 +167,9 @@ function buildLeadPayload(formData: FormData, leadType: LeadPayload["type"]): Le
 }
 
 function buildRelayHeaders() {
-  const headers: Record<string, string> = {
+  return {
     "Content-Type": "application/json"
   };
-  const secret = process.env.NEXT_PUBLIC_LEAD_RELAY_SECRET;
-  if (secret) headers["X-Lead-Relay-Secret"] = secret;
-  return headers;
 }
 
 function getString(formData: FormData, key: string) {
