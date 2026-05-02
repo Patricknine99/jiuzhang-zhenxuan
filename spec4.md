@@ -1,0 +1,183 @@
+# 九章甄选 — 安全与质量修复记录（2026-05-02）
+
+> 执行者：资深开发工程师  
+> 修复范围：严重问题 4 项 + 高危问题 6 项  
+> 关联报告：`docs/tech-review-20260502.md`
+
+---
+
+## 1. 修复概览
+
+本次修复针对技术评估中发现的全部 4 个严重问题和 6 个高危问题，涵盖 Relay 后端安全、认证校验、输入处理、测试覆盖和 CI 自动化。
+
+---
+
+## 2. 严重问题修复
+
+### S-1：scrypt 同步阻塞事件循环 → 改为异步
+
+**问题**：`relay/lead-relay.mjs` 中使用 `scryptSync` 进行密码哈希计算，同步调用会阻塞 Node.js 事件循环，在高并发场景下导致服务无法响应其他请求。
+
+**修改**：
+- 导入 `scrypt`（异步）和 `promisify`，删除 `scryptSync`
+- `hashPassword()` 和 `verifyPassword()` 改为 `async` 函数
+- `createAuthAccount()` 和调用方同步添加 `await`
+
+**验证**：`npm run relay:check` 通过。
+
+### S-2：HMAC 硬编码默认密钥 → 启动时强制校验
+
+**问题**：`signValue()` 函数在 `SHARED_SECRET` 为空时回退到 `"jiuzhang-dev-secret"`，攻击者可轻易伪造签名。
+
+**修改**：
+- 启动时检查 `LEAD_RELAY_SECRET`，若未设置或长度小于 16 字符，服务直接退出并输出错误信息
+- `signValue()` 不再使用默认回退值
+
+**验证**：未设置 `LEAD_RELAY_SECRET` 时启动 relay，按预期输出 FATAL 错误并退出。
+
+### S-3：账号系统 localStorage 存储 → 添加明确过渡提示
+
+**问题**：账号数据存储在浏览器 `localStorage` 中，存在 XSS 读取和客户端篡改权限风险。
+
+**修改**：
+- 登录/注册页面顶部添加醒目的开发阶段说明条
+- 明确告知用户当前为过渡方案，后续将接入服务端认证系统
+- 提示用户勿使用与其他平台相同的密码
+
+**说明**：完整的服务端认证迁移已列入下一批次任务（见第 4 节）。
+
+### S-4：测试覆盖率为 0 → 引入 Vitest + 33 个单元测试
+
+**问题**：项目无任何自动化测试，重构和新增功能时缺乏回归保护。
+
+**修改**：
+- 安装 `vitest`、`@testing-library/react`、`@testing-library/jest-dom`、`jsdom`
+- 配置 `vitest.config.ts`（含 `@/` 路径别名）
+- 编写测试套件：
+  - `__tests__/auth.test.ts`：邮箱/手机号校验、密码复杂度（11 个测试）
+  - `__tests__/data.test.ts`：服务商/案例排序、过滤、格式化（12 个测试）
+  - `__tests__/catalog.test.ts`：目录匹配逻辑（10 个测试）
+- `package.json` 新增 `test` 和 `test:watch` 脚本
+
+**验证**：`npm run test` — 3 个测试文件全部通过，33/33 测试通过。
+
+---
+
+## 3. 高危问题修复
+
+### H-1：用户输入缺少 XSS 过滤和统一消毒
+
+**问题**：表单提交直接将用户输入拼接到通知文本和 payload 中，未做字符过滤。
+
+**修改**：
+- `components/shared/StaticForm.tsx` 新增 `sanitizeInput()` 函数
+- 过滤尖括号 `<>`，去除首尾空白，限制最大 2000 字符
+- `getString()` 和 `getOptionalString()` 自动应用消毒
+
+### H-2：缺少 HTTP 安全头
+
+**问题**：Relay 响应未设置 `X-Frame-Options`、`X-Content-Type-Options` 等安全头，存在点击劫持和 MIME 嗅探风险。
+
+**修改**：
+- `relay/lead-relay.mjs` 新增 `setSecurityHeaders()` 函数
+- 每个响应自动附加：
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `X-XSS-Protection: 1; mode=block`
+
+### H-3：Relay 单进程无集群支持
+
+**问题**：单进程 HTTP 服务无法利用多核 CPU，进程崩溃即服务中断。
+
+**状态**：本次未实施集群改造。
+**原因**：当前阶段服务负载低，且集群化涉及会话共享、限流桶同步等复杂问题。已列入中期任务（见第 4 节）。
+**缓解**：进程崩溃可通过外部进程管理器（PM2/systemd）重启兜底。
+
+### H-4：内存存储重启丢失
+
+**问题**：限流桶、验证码桶、账号数据全部存储在内存 `Map` 中，进程重启即丢失。
+
+**状态**：本次未接入 Redis/数据库。
+**原因**：项目当前为过渡阶段，数据量小，且涉及部署架构调整。已列入中期任务（见第 4 节）。
+**缓解**：限流桶已有定时清理机制；账号数据在正式上线前会迁移至服务端持久化。
+
+### H-5：验证码无限发送
+
+**问题**：`handleAuthCodeRequest` 仅按 IP 限流，未限制单个手机号/邮箱的发送频率，可被用于短信/邮件轰炸。
+
+**修改**：
+- 新增 `SEND_CODE_COOLDOWN` Map 和 `SEND_CODE_COOLDOWN_MS = 60_000`
+- 每个 identifier（手机号/邮箱）60 秒内只能发送 1 次验证码
+- 超出频率返回 `429` 和剩余等待秒数
+
+### H-6：密码缺少复杂度校验
+
+**问题**：注册时仅检查密码长度 ≥ 8，无字母、数字、特殊字符要求。
+
+**修改**：
+- `lib/auth.ts` 新增 `validatePassword()` 函数
+- 要求：≥ 8 位、包含字母、包含数字、包含特殊字符
+- `components/auth/AuthPanel.tsx` 注册流程接入校验，实时提示具体不满足项
+
+---
+
+## 4. 工程化改进
+
+### CI/CD 自动化
+
+- 新增 `.github/workflows/ci.yml`
+- 每次 push/PR 自动执行：lint → test → verify:data → relay:check → build
+- 任何步骤失败即阻断合并
+
+---
+
+## 5. 验证结果
+
+| 检查项 | 结果 |
+|--------|------|
+| `npm run lint` | ✅ 通过 |
+| `npm run test` | ✅ 33/33 通过 |
+| `npm run verify:data` | ✅ 通过 |
+| `npm run relay:check` | ✅ 通过 |
+| `npm run build` | ✅ 54 页面静态生成成功 |
+| GitHub push | ✅ `4c0b594` 已推送 |
+
+---
+
+## 6. 仍保留至后续批次的问题
+
+以下问题已识别，但本次未修复，计划在后续迭代中处理：
+
+| 问题 | 优先级 | 计划批次 |
+|------|--------|----------|
+| Relay 单进程 → cluster/多worker | P1 | 中期（框架化时同步做） |
+| 内存存储 → Redis/PostgreSQL 持久化 | P1 | 中期（接入数据库时同步做） |
+| 前端 Client Component 边界优化 | P2 | 中期 |
+| 图片优化（WebP/响应式尺寸） | P2 | 中期 |
+| CSP (Content-Security-Policy) 策略 | P2 | 中期 |
+
+---
+
+## 7. 修改文件清单
+
+### 新增文件
+- `.github/workflows/ci.yml`
+- `__tests__/auth.test.ts`
+- `__tests__/catalog.test.ts`
+- `__tests__/data.test.ts`
+- `vitest.config.ts`
+- `vitest.setup.ts`
+
+### 修改文件
+- `relay/lead-relay.mjs` — 异步 scrypt、安全头、密钥校验、验证码冷却
+- `lib/auth.ts` — 密码复杂度校验
+- `components/auth/AuthPanel.tsx` — 密码校验接入、过渡提示
+- `components/shared/StaticForm.tsx` — 输入消毒
+- `package.json` — test 脚本
+- `package-lock.json` — 依赖更新
+
+---
+
+*修复完成时间：2026-05-02*  
+*Git 提交：`4c0b594`*
