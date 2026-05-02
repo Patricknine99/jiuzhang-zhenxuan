@@ -18,7 +18,7 @@ export default function RegisterPage() {
         </p>
         <p className="mt-6 text-sm text-stone-500">
           已有账号？{" "}
-          <Link href="/login" className="font-semibold text-[var(--color-brand)]">
+          <Link href="/login?role=buyer" className="font-semibold text-[var(--color-brand)]">
             去登录
           </Link>
         </p>

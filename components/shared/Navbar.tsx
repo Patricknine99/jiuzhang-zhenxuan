@@ -21,6 +21,7 @@ export function Navbar() {
                 title: "需求方工作台",
                 links: [
                   { href: "/buyers", label: "需求方入口", description: "从诊断、匹配到验收的完整路径。" },
+                  { href: "/login?role=buyer", label: "需求方登录", description: "进入企业买家系统，查看需求与跟进记录。" },
                   { href: "/diagnosis", label: "AI 需求诊断", description: "先把模糊业务问题拆成可执行方案。" },
                   { href: "/post-demand", label: "发布需求", description: "提交预算、周期和业务痛点，等待平台跟进。" }
                 ]
@@ -51,6 +52,7 @@ export function Navbar() {
                 title: "服务商入口",
                 links: [
                   { href: "/creators", label: "供给方入口", description: "了解认证、案例包装和接单路径。" },
+                  { href: "/login?role=provider", label: "供给方登录", description: "进入服务商系统，查看入驻与接单准备。" },
                   { href: "/join", label: "服务商入驻", description: "提交团队信息、案例、技术栈和预算区间。" },
                   { href: "/provider-agreement", label: "服务商协议", description: "查看交付、版权、验收与平台规则。" }
                 ]
@@ -80,7 +82,7 @@ export function Navbar() {
             <Users className="h-4 w-4" />
             供给方
           </Link>
-          <Link className="hidden items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-950 sm:inline-flex" href="/login">
+          <Link className="hidden items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-950 sm:inline-flex" href="/login?role=buyer">
             <LogIn className="h-4 w-4" />
             登录
           </Link>
@@ -120,7 +122,7 @@ export function Navbar() {
           <Link href="/sla" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             验收标准
           </Link>
-          <Link href="/login" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/login?role=buyer" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
             登录
           </Link>
           <Link href="/admin" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">

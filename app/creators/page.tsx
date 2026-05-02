@@ -22,6 +22,10 @@ export default function CreatorsPage() {
               适合 AI 创作者、独立工作室、OPC 和自动化顾问。平台关注的不是单张作品，而是真实案例、报价边界、响应 SLA、版权声明和可复用交付流程。
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link href="/register?role=provider" className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-6 py-3.5 font-semibold text-stone-700 hover:bg-white">
+                <BriefcaseBusiness className="h-5 w-5" />
+                创建供给方账号
+              </Link>
               <Link href="/join" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-6 py-3.5 font-semibold text-white hover:bg-[var(--color-brand-hover)]">
                 <Sparkles className="h-5 w-5" />
                 申请成为精选服务商

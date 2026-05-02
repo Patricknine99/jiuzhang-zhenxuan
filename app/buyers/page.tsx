@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, FileText, Search, ShieldCheck, WalletCards } from "lucide-react";
+import { ArrowRight, ClipboardCheck, FileText, Search, ShieldCheck, UserRound, WalletCards } from "lucide-react";
 import { ProviderCard } from "@/components/shared/ProviderCard";
 import { SectionHeading } from "@/components/shared/SectionHeading";
 import { getFeaturedProviders } from "@/lib/data";
@@ -26,6 +26,10 @@ export default function BuyersPage() {
               适合企业、品牌方、中小商家。你不需要先懂模型、工具和技术栈，只需要说清楚业务目标、预算和时间，平台会帮你拆解需求、匹配服务商并给出验收边界。
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link href="/register?role=buyer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-6 py-3.5 font-semibold text-stone-700 hover:bg-white">
+                <UserRound className="h-5 w-5" />
+                创建需求方账号
+              </Link>
               <Link href="/diagnosis" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-6 py-3.5 font-semibold text-white hover:bg-[var(--color-brand-hover)]">
                 <Search className="h-5 w-5" />
                 先做 AI 需求诊断

@@ -265,6 +265,14 @@ async function handleAuthCodeRequest(request, response, origin, requestId) {
     const method = normalizeAuthMethod(body.method);
     const identifier = normalizeAuthIdentifier(method, body.identifier);
     const purpose = body.purpose === "register" ? "register" : "login";
+    const role = normalizeAccountRole(body.role);
+    const existingAccount = await getAuthAccount(method, identifier);
+
+    if (existingAccount) {
+      assertAccountRoleAccess(existingAccount, role, purpose);
+    } else if (purpose === "login") {
+      throw new Error("账号或密码不正确");
+    }
 
     // Per-identifier send cooldown (Redis-backed)
     const cooldownKey = `${method}:${identifier}`;
@@ -278,7 +286,7 @@ async function handleAuthCodeRequest(request, response, origin, requestId) {
 
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
 
-    await storeAuthCode(method, identifier, purpose, signValue(code), AUTH_CODE_TTL_MS);
+    await storeAuthCode(method, identifier, purpose, role, signValue(code), AUTH_CODE_TTL_MS);
 
     sendJson(response, 200, {
       ok: true,
@@ -313,15 +321,15 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
     const method = normalizeAuthMethod(body.method);
     const identifier = normalizeAuthIdentifier(method, body.identifier);
     const purpose = body.purpose === "register" ? "register" : "login";
-    const role = body.role === "provider" ? "provider" : "buyer";
+    const role = normalizeAccountRole(body.role);
     const password = normalizePassword(body.password);
     const deviceId = normalizeDeviceId(body.deviceId);
 
     const existingAccount = await getAuthAccount(method, identifier);
 
     if (purpose === "register") {
-      if (existingAccount) throw new Error("该账号已注册，请直接登录");
-      await dbVerifyAuthCode(method, identifier, purpose, body.code, AUTH_CODE_MAX_ATTEMPTS, verifyCodeHash);
+      if (existingAccount) assertAccountRoleAccess(existingAccount, role, purpose);
+      await dbVerifyAuthCode(method, identifier, purpose, role, body.code, AUTH_CODE_MAX_ATTEMPTS, verifyCodeHash);
       const account = await createAuthAccount({
         id: `acct_${Date.now().toString(36)}_${signValue(identifier).slice(0, 8)}`,
         method,
@@ -341,6 +349,7 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
     }
 
     if (!existingAccount) throw new Error("账号或密码不正确");
+    assertAccountRoleAccess(existingAccount, role, purpose);
     if (!(await verifyPassword(password, existingAccount.passwordHash))) throw new Error("账号或密码不正确");
 
     const isTrustedDevice = existingAccount.trustedDevices.has(deviceId);
@@ -354,7 +363,7 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
         });
         return;
       }
-      await dbVerifyAuthCode(method, identifier, purpose, body.code, AUTH_CODE_MAX_ATTEMPTS, verifyCodeHash);
+      await dbVerifyAuthCode(method, identifier, purpose, role, body.code, AUTH_CODE_MAX_ATTEMPTS, verifyCodeHash);
       await addTrustedDevice(method, identifier, deviceId);
     }
 
@@ -838,6 +847,24 @@ function normalizeAuthIdentifier(method, value) {
   if (method === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error("邮箱格式不正确");
   if (method === "phone" && !/^1[3-9]\d{9}$/.test(normalized)) throw new Error("手机号格式不正确");
   return normalized;
+}
+
+function normalizeAccountRole(value) {
+  if (value === "buyer" || value === "provider") return value;
+  throw new Error("请选择需求方或供给方账号系统");
+}
+
+function getAccountRoleLabel(role) {
+  return role === "provider" ? "供给方" : "需求方";
+}
+
+function assertAccountRoleAccess(account, requestedRole, purpose) {
+  if (account.role !== requestedRole) {
+    throw new Error(`该账号已属于${getAccountRoleLabel(account.role)}系统，不能用于${getAccountRoleLabel(requestedRole)}系统。`);
+  }
+  if (purpose === "register") {
+    throw new Error(`该账号已注册为${getAccountRoleLabel(account.role)}账号，请直接登录。`);
+  }
 }
 
 function normalizeAdminEmail(value) {

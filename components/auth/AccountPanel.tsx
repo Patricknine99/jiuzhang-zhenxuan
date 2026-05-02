@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
+import { Building2, FileText, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { authStorageKey, type LocalAccount } from "@/lib/auth";
 
 type Submission = {
@@ -24,42 +25,66 @@ export function AccountPanel() {
         <h1 className="text-2xl font-bold">还没有登录</h1>
         <p className="mt-3 text-stone-600">登录或注册后，后续可以查看需求诊断、服务商入驻状态和人工跟进记录。</p>
         <div className="mt-6 flex justify-center gap-3">
-          <Link href="/login" className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold">
-            登录
+          <Link href="/login?role=buyer" className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold">
+            需求方登录
           </Link>
-          <Link href="/register" className="rounded-xl bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white">
-            注册
+          <Link href="/register?role=provider" className="rounded-xl bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white">
+            供给方注册
           </Link>
         </div>
       </div>
     );
   }
 
+  const accountHome = account.role === "provider" ? "/creators" : "/buyers";
+  const visibleSubmissions = submissions.filter((submission) => (account.role === "provider" ? submission.type === "application" : submission.type === "demand"));
+
   return (
     <div className="rounded-2xl bg-white p-8 ring-1 ring-stone-200">
-      <p className="text-sm font-semibold text-[var(--color-brand)]">当前账号</p>
+      <p className="text-sm font-semibold text-[var(--color-brand)]">当前{account.role === "provider" ? "供给方" : "需求方"}账号</p>
       <h1 className="mt-2 text-3xl font-bold">{account.displayName}</h1>
       <dl className="mt-6 grid gap-4 text-sm md:grid-cols-2">
         <Info label="登录方式" value={account.method === "phone" ? "手机号" : "邮箱"} />
         <Info label="账号标识" value={account.identifier} />
-        <Info label="账号类型" value={account.role === "provider" ? "服务商" : "企业用户"} />
+        <Info label="账号系统" value={account.role === "provider" ? "供给方系统" : "需求方系统"} />
         <Info label="创建时间" value={new Date(account.createdAt).toLocaleString("zh-CN")} />
       </dl>
-      <button
-        type="button"
-        className="mt-8 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700"
-        onClick={() => {
-          window.localStorage.removeItem(authStorageKey);
-          window.dispatchEvent(new StorageEvent("storage", { key: authStorageKey }));
-        }}
-      >
-        退出登录
-      </button>
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link href={accountHome} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white">
+          {account.role === "provider" ? <Building2 className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+          进入{account.role === "provider" ? "供给方" : "需求方"}入口
+        </Link>
+        {account.role === "provider" ? (
+          <Link href="/join" className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700">
+            <Sparkles className="h-4 w-4" />
+            管理入驻申请
+          </Link>
+        ) : (
+          <Link href="/post-demand" className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700">
+            <FileText className="h-4 w-4" />
+            发布需求
+          </Link>
+        )}
+        <button
+          type="button"
+          className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700"
+          onClick={() => {
+            window.localStorage.removeItem(authStorageKey);
+            window.dispatchEvent(new StorageEvent("storage", { key: authStorageKey }));
+          }}
+        >
+          退出登录
+        </button>
+      </div>
+      <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
+        <ShieldCheck className="mr-2 inline h-4 w-4 text-[var(--color-brand)]" />
+        该账号只能访问{account.role === "provider" ? "供给方" : "需求方"}系统；同一手机号或邮箱不能再注册为另一端账号。
+      </div>
       <section className="mt-10 border-t border-stone-100 pt-8">
-        <h2 className="text-xl font-bold">最近提交</h2>
-        {submissions.length > 0 ? (
+        <h2 className="text-xl font-bold">最近{account.role === "provider" ? "入驻" : "需求"}提交</h2>
+        {visibleSubmissions.length > 0 ? (
           <div className="mt-4 space-y-3">
-            {submissions.map((submission) => (
+            {visibleSubmissions.map((submission) => (
               <div key={`${submission.type}-${submission.requestId}-${submission.submittedAt}`} className="rounded-xl bg-stone-50 p-4 text-sm">
                 <div className="flex items-center justify-between gap-4">
                   <span className="font-semibold text-stone-900">{submission.type === "demand" ? "企业需求" : "服务商入驻"}</span>
@@ -71,7 +96,7 @@ export function AccountPanel() {
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-stone-500">暂无提交记录。发布需求或提交入驻申请后会显示在这里。</p>
+          <p className="mt-3 text-sm text-stone-500">{account.role === "provider" ? "暂无入驻提交记录。提交入驻申请后会显示在这里。" : "暂无需求提交记录。发布需求后会显示在这里。"}</p>
         )}
       </section>
     </div>

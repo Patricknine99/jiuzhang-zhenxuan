@@ -21,7 +21,7 @@ export default function JoinPage() {
           供给方认证路径
         </Link>
         ，并注册服务商账号，后续可查看审核状态和补充资料。{" "}
-        <Link href="/register" className="font-semibold text-[var(--color-brand)]">
+        <Link href="/register?role=provider" className="font-semibold text-[var(--color-brand)]">
           去注册服务商账号
         </Link>
       </div>

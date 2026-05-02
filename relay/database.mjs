@@ -68,11 +68,12 @@ export async function getRecentLeads(limit = 50) {
  * @param {string} method
  * @param {string} identifier
  * @param {string} purpose
+ * @param {string} role
  * @param {string} codeHash
  * @param {number} ttlMs
  */
-export async function storeAuthCode(method, identifier, purpose, codeHash, ttlMs) {
-  const key = `${purpose}:${method}:${identifier}`;
+export async function storeAuthCode(method, identifier, purpose, role, codeHash, ttlMs) {
+  const key = getAuthCodeKey(method, identifier, purpose, role);
   if (redis.status === "ready" || redis.status === "connect") {
     try {
       await setAuthCode(key, codeHash, ttlMs);
@@ -98,12 +99,13 @@ export async function storeAuthCode(method, identifier, purpose, codeHash, ttlMs
  * @param {string} method
  * @param {string} identifier
  * @param {string} purpose
+ * @param {string} role
  * @param {string} code
  * @param {number} maxAttempts
  * @param {Function} isValidSecretFn
  */
-export async function verifyAuthCode(method, identifier, purpose, code, maxAttempts, isValidSecretFn) {
-  const key = `${purpose}:${method}:${identifier}`;
+export async function verifyAuthCode(method, identifier, purpose, role, code, maxAttempts, isValidSecretFn) {
+  const key = getAuthCodeKey(method, identifier, purpose, role);
 
   if (redis.status === "ready" || redis.status === "connect") {
     try {
@@ -148,21 +150,22 @@ export async function verifyAuthCode(method, identifier, purpose, code, maxAttem
   await query(`DELETE FROM auth_codes WHERE key = $1`, [key]);
 }
 
+function getAuthCodeKey(method, identifier, purpose, role) {
+  return `${purpose}:${role}:${method}:${identifier}`;
+}
+
 /**
  * Create auth account in PostgreSQL.
  */
 export async function createAuthAccount({ id, method, identifier, displayName, role, passwordHash, trustedDevices }) {
-  await query(
+  const result = await query(
     `INSERT INTO auth_accounts (id, method, identifier, display_name, role, password_hash, trusted_devices)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (identifier) DO UPDATE SET
-       display_name = EXCLUDED.display_name,
-       role = EXCLUDED.role,
-       password_hash = EXCLUDED.password_hash,
-       trusted_devices = EXCLUDED.trusted_devices,
-       updated_at = NOW()`,
+     ON CONFLICT (identifier) DO NOTHING
+     RETURNING id`,
     [id, method, identifier, displayName, role, passwordHash, trustedDevices]
   );
+  if (result.rowCount === 0) throw new Error("该账号已存在，不能重复创建");
   return { id, method, identifier, displayName, role, trustedDevices };
 }
 

@@ -102,7 +102,7 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 ```bash
 curl -X POST http://127.0.0.1:8787/api/auth/code \
   -H 'Content-Type: application/json' \
-  -d '{"method":"phone","identifier":"13800138000","purpose":"login"}'
+  -d '{"method":"phone","identifier":"13800138000","purpose":"login","role":"buyer"}'
 ```
 
 注册或新设备登录时先发送验证码，然后调用 `/api/auth/session`：
@@ -113,7 +113,7 @@ curl -X POST http://127.0.0.1:8787/api/auth/session \
   -d '{"method":"phone","identifier":"13800138000","purpose":"register","password":"StrongPass123","code":"123456","role":"buyer","deviceId":"dev_local_123456789"}'
 ```
 
-已信任设备再次登录只需要账号密码；新设备登录会返回 `requiresVerification: true`，前端再引导用户获取并输入验证码。dry-run 模式会返回 `devCode` 便于本地验证；生产环境不得开启 dry-run，也不会返回验证码明文。
+`role` 是账号所属系统，`buyer` 为需求方，`provider` 为供给方。同一手机号或邮箱只能绑定一个系统；服务端会在验证码发送和会话建立时拒绝跨系统登录或重复注册，避免需求方/供给方数据混用。已信任设备再次登录只需要账号密码；新设备登录会返回 `requiresVerification: true`，前端再引导用户获取并输入验证码。dry-run 模式会返回 `devCode` 便于本地验证；生产环境不得开启 dry-run，也不会返回验证码明文。
 
 ### 微信支付
 

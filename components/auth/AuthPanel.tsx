@@ -9,6 +9,11 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 type AuthMode = "login" | "register";
 type Method = "email" | "phone";
+type Role = LocalAccount["role"];
+type DemoAccountRecord = {
+  password: string;
+  role: Role;
+};
 type AuthRelayResponse = {
   ok?: boolean;
   requestId?: string;
@@ -24,7 +29,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   const formRef = useRef<HTMLFormElement>(null);
   const isRegister = mode === "register";
   const [method, setMethod] = useState<Method>("phone");
-  const [role, setRole] = useState<LocalAccount["role"]>("buyer");
+  const [role, setRole] = useState<Role>(() => getInitialRoleFromLocation());
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
@@ -62,26 +67,27 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         <strong>开发阶段说明：</strong>当前账号数据暂存于浏览器本地，后续将接入服务端认证系统。请勿在此系统使用与其他平台相同的密码。
       </div>
 
-      {isRegister ? (
-        <div className="mt-5 grid grid-cols-2 gap-2">
+      <div className="mt-5">
+        <p className="mb-2 text-sm font-semibold text-stone-700">{isRegister ? "选择账号系统（创建后不可切换）" : "选择登录系统"}</p>
+        <div className="grid grid-cols-2 gap-2">
           {[
-            ["buyer", UserRound, "企业用户"],
-            ["provider", Building2, "服务商"]
+            ["buyer", UserRound, "需求方账号"],
+            ["provider", Building2, "供给方账号"]
           ].map(([value, Icon, label]) => (
             <button
               key={value as string}
               type="button"
-              className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${
                 role === value ? "border-orange-300 bg-amber-100 text-amber-900" : "border-stone-200 text-stone-600"
               }`}
-              onClick={() => setRole(value as LocalAccount["role"])}
+              onClick={() => setRole(value as Role)}
             >
               <Icon className="h-4 w-4" />
               {label as string}
             </button>
           ))}
         </div>
-      ) : null}
+      </div>
 
       <form
         ref={formRef}
@@ -117,7 +123,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
               identifier: normalized.value,
               password,
               code: needsVerification ? code.trim() : undefined,
-              role: isRegister ? role : "buyer",
+              role,
               purpose: mode,
               captchaToken: getCaptchaToken(formRef.current),
               deviceId: getOrCreateAuthDeviceId()
@@ -190,6 +196,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
                       method,
                       identifier: normalized.value,
                       purpose: mode,
+                      role,
                       captchaToken: getCaptchaToken(formRef.current)
                     });
                     setMessage(result.devCode ? `Dry-run 验证码：${result.devCode}。生产环境不会返回验证码。` : "验证码已提交发送，请注意查收。");
@@ -238,10 +245,14 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-async function requestAuthCode(input: { method: Method; identifier: string; purpose: AuthMode; captchaToken?: string }) {
+async function requestAuthCode(input: { method: Method; identifier: string; purpose: AuthMode; role: Role; captchaToken?: string }) {
   const relayUrl = process.env.NEXT_PUBLIC_AUTH_RELAY_URL;
   if (!relayUrl) {
     await delay(500);
+    const existing = readDemoAccount(input.method, input.identifier);
+    if (existing && existing.role !== input.role) {
+      throw new Error(`该账号已属于${getRoleLabel(existing.role)}系统，不能用于${getRoleLabel(input.role)}系统。`);
+    }
     return { ok: true, devCode: "123456" } satisfies AuthRelayResponse;
   }
   const response = await fetch(`${relayUrl.replace(/\/$/, "")}/code`, {
@@ -268,20 +279,25 @@ async function verifyAuthSession(input: {
   if (!relayUrl) {
     await delay(420);
     if (input.password.length < 8) throw new Error("静态演示模式密码至少 8 位。");
-    const trustedKey = `jiuzhang:trusted-device:${input.method}:${input.identifier}`;
-    const passwordKey = `jiuzhang:demo-password:${input.method}:${input.identifier}`;
+    const trustedKey = getDemoTrustedKey(input.role, input.method, input.identifier);
     const trustedDevice = window.localStorage.getItem(trustedKey);
-    const savedPassword = window.localStorage.getItem(passwordKey);
-    if (input.purpose === "login" && savedPassword !== input.password) {
-      throw new Error(savedPassword ? "账号或密码不正确。" : "静态演示模式请先注册一次。");
+    const savedAccount = readDemoAccount(input.method, input.identifier);
+    if (savedAccount && savedAccount.role !== input.role) {
+      throw new Error(`该账号已属于${getRoleLabel(savedAccount.role)}系统，请从${getRoleLabel(savedAccount.role)}入口登录。`);
+    }
+    if (input.purpose === "login" && savedAccount?.password !== input.password) {
+      throw new Error(savedAccount ? "账号或密码不正确。" : `静态演示模式请先注册${getRoleLabel(input.role)}账号。`);
     }
     if (input.purpose === "register" || trustedDevice !== input.deviceId) {
       if (!input.code) return { requiresVerification: true };
       if (input.code !== "123456") throw new Error("静态演示模式验证码为 123456。配置 NEXT_PUBLIC_AUTH_RELAY_URL 后会改用服务端验证码。");
-      if (input.purpose === "register") window.localStorage.setItem(passwordKey, input.password);
+      if (input.purpose === "register") {
+        if (savedAccount) throw new Error(`该账号已注册为${getRoleLabel(savedAccount.role)}账号。`);
+        window.localStorage.setItem(getDemoAccountKey(input.method, input.identifier), JSON.stringify({ password: input.password, role: input.role } satisfies DemoAccountRecord));
+      }
       window.localStorage.setItem(trustedKey, input.deviceId);
     }
-    return { account: createLocalAccount(input.method, input.identifier, input.purpose === "register" ? input.role : "buyer") };
+    return { account: createLocalAccount(input.method, input.identifier, input.role) };
   }
   const response = await fetch(`${relayUrl.replace(/\/$/, "")}/session`, {
     method: "POST",
@@ -306,6 +322,41 @@ function ReservedAuthButton({ label, icon }: { label: string; icon: React.ReactN
       {label}
     </button>
   );
+}
+
+function getInitialRoleFromLocation(): Role {
+  if (typeof window === "undefined") return "buyer";
+  return new URLSearchParams(window.location.search).get("role") === "provider" ? "provider" : "buyer";
+}
+
+function getRoleLabel(role: Role) {
+  return role === "provider" ? "供给方" : "需求方";
+}
+
+function getDemoAccountKey(method: Method, identifier: string) {
+  return `jiuzhang:demo-account:${method}:${identifier}`;
+}
+
+function getLegacyDemoPasswordKey(method: Method, identifier: string) {
+  return `jiuzhang:demo-password:${method}:${identifier}`;
+}
+
+function getDemoTrustedKey(role: Role, method: Method, identifier: string) {
+  return `jiuzhang:trusted-device:${role}:${method}:${identifier}`;
+}
+
+function readDemoAccount(method: Method, identifier: string): DemoAccountRecord | null {
+  const raw = window.localStorage.getItem(getDemoAccountKey(method, identifier));
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as DemoAccountRecord;
+      if ((parsed.role === "buyer" || parsed.role === "provider") && typeof parsed.password === "string") return parsed;
+    } catch {
+      return null;
+    }
+  }
+  const legacyPassword = window.localStorage.getItem(getLegacyDemoPasswordKey(method, identifier));
+  return legacyPassword ? { password: legacyPassword, role: "buyer" } : null;
 }
 
 function validateIdentifier(method: Method, value: string): { ok: true; value: string } | { ok: false; message: string } {
