@@ -74,7 +74,7 @@ DINGTALK_AT_MOBILES=
 
 当前主站未配置 `NEXT_PUBLIC_LEAD_RELAY_URL` 时，表单会以静态 Demo 模式直接进入成功页；配置后会向 relay 发送真实请求。
 
-## 8. AI 与账号接口预留
+## 8. AI、账号与防机器人
 
 由 ChatGPT 于 2026-05-01 补充：
 
@@ -82,9 +82,19 @@ DINGTALK_AT_MOBILES=
 - 诊断 AI 接口环境变量：`NEXT_PUBLIC_DIAGNOSIS_AI_URL`
 - 悬浮客服 AI 接口环境变量：`NEXT_PUBLIC_SUPPORT_AI_URL`
 - 当前账号页：`/login`、`/register`、`/account`
-- 当前已做手机号/邮箱前端注册登录流程，真实短信、邮箱登录、微信、企业微信、飞书 OAuth 仍需后端用户系统支持。
+- 当前已做手机号/邮箱验证码流程。未配置 `NEXT_PUBLIC_AUTH_RELAY_URL` 时仅用于静态演示，验证码固定为 `123456`；配置后会调用 relay 的 `/api/auth/code` 与 `/api/auth/session`，由服务端校验一次性验证码。
+- 防机器人使用 Cloudflare Turnstile 预留：前端配置 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 后显示校验组件；relay 配置 `LEAD_CAPTCHA_REQUIRED=true` 与 `TURNSTILE_SECRET_KEY` 后强制验证。
+- 微信、企业微信、飞书 OAuth 入口保留为禁用状态，等待真实开放平台应用信息后接入。
 
-## 9. 灰度与生产检查
+## 9. 微信支付预留
+
+由 ChatGPT 于 2026-05-02 补充：
+
+- 微信支付只在 relay 服务端预留 `/api/payments/wechat/prepay`。
+- 未配置 `WECHAT_PAY_*` 时返回 503，配置齐全但签名实现未完成时返回 501，避免出现“前端可点但支付链路不可用”的误导。
+- 生产环境需要补齐微信支付商户证书签名、回调验签、订单幂等、金额服务端计算、支付状态查询和退款权限控制。
+
+## 10. 灰度与生产检查
 
 由 ChatGPT 于 2026-05-02 补充：
 

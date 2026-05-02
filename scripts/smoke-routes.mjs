@@ -8,6 +8,7 @@ const routes = [
   "/services",
   "/services/ai-automation",
   "/industries/ecommerce",
+  "/solutions/ai-automation/ecommerce",
   "/diagnosis",
   "/login",
   "/register",
@@ -31,7 +32,7 @@ for (const route of routes) {
   if (text.includes("Application error")) failures.push(`${route} contains Application error`);
 }
 
-for (const route of ["/providers/bad-slug", "/cases/bad-slug", "/services/bad-slug", "/industries/bad-slug"]) {
+for (const route of ["/providers/bad-slug", "/cases/bad-slug", "/services/bad-slug", "/industries/bad-slug", "/solutions/bad/ecommerce"]) {
   const response = await fetch(`${baseUrl}${route}`, { redirect: "follow" });
   console.log(`${route.padEnd(36)} ${response.status}`);
   if (response.status !== 404) failures.push(`${route} expected 404, got ${response.status}`);

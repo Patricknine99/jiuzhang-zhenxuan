@@ -115,3 +115,20 @@ export function getCasesForIndustry(category: IndustryCategory) {
   const aliases = industryAliases[category.slug] || [category.title];
   return getCases().filter((caseStudy) => caseStudy.industry.some((item) => aliases.includes(item)));
 }
+
+export function getSolutionCategory(serviceSlug: string, industrySlug: string) {
+  const service = getServiceCategory(serviceSlug);
+  const industry = getIndustryCategory(industrySlug);
+  if (!service || !industry) return undefined;
+  return { service, industry };
+}
+
+export function getProvidersForSolution(service: ServiceCategory, industry: IndustryCategory) {
+  const serviceProviders = new Set(getProvidersForService(service).map((provider) => provider.slug));
+  return getProvidersForIndustry(industry).filter((provider) => serviceProviders.has(provider.slug));
+}
+
+export function getCasesForSolution(service: ServiceCategory, industry: IndustryCategory) {
+  const serviceCases = new Set(getCasesForService(service).map((caseStudy) => caseStudy.slug));
+  return getCasesForIndustry(industry).filter((caseStudy) => serviceCases.has(caseStudy.slug));
+}

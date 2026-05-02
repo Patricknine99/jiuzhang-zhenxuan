@@ -1,21 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, MessageCircle, Phone, UserRound } from "lucide-react";
 import { authStorageKey, createLocalAccount, isValidEmail, isValidPhone, type LocalAccount } from "@/lib/auth";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { TurnstileField } from "@/components/shared/TurnstileField";
 
 type AuthMode = "login" | "register";
 type Method = "email" | "phone";
+type AuthRelayResponse = {
+  ok?: boolean;
+  requestId?: string;
+  devCode?: string;
+  account?: LocalAccount;
+  message?: string;
+  error?: { message?: string };
+};
 
 export function AuthPanel({ mode }: { mode: AuthMode }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [method, setMethod] = useState<Method>("phone");
   const [role, setRole] = useState<LocalAccount["role"]>("buyer");
   const [identifier, setIdentifier] = useState("");
   const [code, setCode] = useState("");
-  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,6 +76,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       ) : null}
 
       <form
+        ref={formRef}
         className="mt-6 space-y-4"
         onSubmit={async (event) => {
           event.preventDefault();
@@ -78,17 +88,19 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
             setError(normalized.message);
             return;
           }
-          if (method === "phone" && !/^\d{6}$/.test(code.trim())) {
-            setError("请输入 6 位短信验证码。当前为预留流程，可使用任意 6 位数字。");
-            return;
-          }
-          if (method === "email" && password.trim().length < 6) {
-            setError("请输入至少 6 位密码。当前为前端预留登录流程。");
+          if (!/^\d{6}$/.test(code.trim())) {
+            setError(method === "phone" ? "请输入 6 位短信验证码。" : "请输入 6 位邮箱验证码。");
             return;
           }
           setIsSubmitting(true);
-          await delay(420);
-          const account = createLocalAccount(method, normalized.value, isRegister ? role : "buyer");
+          const account = await verifyAuthCode({
+            method,
+            identifier: normalized.value,
+            code: code.trim(),
+            role: isRegister ? role : "buyer",
+            purpose: mode,
+            captchaToken: getCaptchaToken(formRef.current)
+          });
           window.localStorage.setItem(authStorageKey, JSON.stringify(account));
           setMessage(isRegister ? "注册成功，正在进入账号页。" : "登录成功，正在进入账号页。");
           setIsSubmitting(false);
@@ -109,34 +121,46 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
             />
           </div>
         </label>
-        {method === "phone" ? (
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-stone-700">短信验证码</span>
-            <div className="grid grid-cols-[1fr_auto] gap-2">
-              <input className="field" value={code} onChange={(event) => setCode(event.target.value)} placeholder="任意 6 位数字" inputMode="numeric" required disabled={isSubmitting} />
-              <button
-                type="button"
-                disabled={isSendingCode}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={async () => {
-                  setIsSendingCode(true);
-                  setMessage("");
-                  await delay(500);
-                  setMessage("验证码接口已预留：后续接入短信服务商后会真实发送。当前可使用任意 6 位数字。");
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-stone-700">{method === "phone" ? "短信验证码" : "邮箱验证码"}</span>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <input className="field" value={code} onChange={(event) => setCode(event.target.value)} placeholder="6 位数字" inputMode="numeric" required disabled={isSubmitting} />
+            <button
+              type="button"
+              disabled={isSendingCode}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={async () => {
+                setIsSendingCode(true);
+                setError("");
+                setMessage("");
+                const normalized = validateIdentifier(method, identifier);
+                if (!normalized.ok) {
+                  setError(normalized.message);
                   setIsSendingCode(false);
-                }}
-              >
-                {isSendingCode ? <LoadingSpinner /> : null}
-                {isSendingCode ? "发送中" : "获取验证码"}
-              </button>
-            </div>
-          </label>
-        ) : (
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-stone-700">密码</span>
-            <input className="field" value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="至少 6 位" required disabled={isSubmitting} />
-          </label>
-        )}
+                  return;
+                }
+                try {
+                  const result = await requestAuthCode({
+                    method,
+                    identifier: normalized.value,
+                    purpose: mode,
+                    captchaToken: getCaptchaToken(formRef.current)
+                  });
+                  setMessage(result.devCode ? `Dry-run 验证码：${result.devCode}。生产环境不会返回验证码。` : "验证码已提交发送，请注意查收。");
+                } catch (caught) {
+                  setError(caught instanceof Error ? caught.message : "验证码发送失败，请稍后重试。");
+                } finally {
+                  setIsSendingCode(false);
+                }
+              }}
+            >
+              {isSendingCode ? <LoadingSpinner /> : null}
+              {isSendingCode ? "发送中" : "获取验证码"}
+            </button>
+          </div>
+        </label>
+
+        <TurnstileField />
 
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
         {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
@@ -161,6 +185,44 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
 
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function requestAuthCode(input: { method: Method; identifier: string; purpose: AuthMode; captchaToken?: string }) {
+  const relayUrl = process.env.NEXT_PUBLIC_AUTH_RELAY_URL;
+  if (!relayUrl) {
+    await delay(500);
+    return { ok: true, devCode: "123456" } satisfies AuthRelayResponse;
+  }
+  const response = await fetch(`${relayUrl.replace(/\/$/, "")}/code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  const body = (await response.json().catch(() => null)) as AuthRelayResponse | null;
+  if (!response.ok || body?.ok === false) throw new Error(body?.error?.message || body?.message || "验证码发送失败");
+  return body || { ok: true };
+}
+
+async function verifyAuthCode(input: { method: Method; identifier: string; purpose: AuthMode; code: string; role: LocalAccount["role"]; captchaToken?: string }) {
+  const relayUrl = process.env.NEXT_PUBLIC_AUTH_RELAY_URL;
+  if (!relayUrl) {
+    await delay(420);
+    if (input.code !== "123456") throw new Error("静态演示模式验证码为 123456。配置 NEXT_PUBLIC_AUTH_RELAY_URL 后会改用服务端验证码。");
+    return createLocalAccount(input.method, input.identifier, input.purpose === "register" ? input.role : "buyer");
+  }
+  const response = await fetch(`${relayUrl.replace(/\/$/, "")}/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  const body = (await response.json().catch(() => null)) as AuthRelayResponse | null;
+  if (!response.ok || body?.ok === false || !body?.account) throw new Error(body?.error?.message || body?.message || "登录验证失败");
+  return body.account;
+}
+
+function getCaptchaToken(form: HTMLFormElement | null) {
+  const value = form ? new FormData(form).get("captchaToken") : "";
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function ReservedAuthButton({ label, icon }: { label: string; icon: React.ReactNode }) {

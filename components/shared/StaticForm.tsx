@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { TurnstileField } from "@/components/shared/TurnstileField";
 import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integrations";
 
 type RelayResponse = {
@@ -120,6 +121,7 @@ export function StaticForm({
         <label htmlFor={honeypotName}>Website</label>
         <input id={honeypotName} name={honeypotName} type="text" tabIndex={-1} autoComplete="off" />
       </div>
+      <TurnstileField />
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
@@ -158,7 +160,8 @@ function buildLeadPayload(formData: FormData, leadType: LeadPayload["type"]): Le
       phone: getOptionalString(formData, "phone"),
       wechat: getOptionalString(formData, "wechat"),
       context: getOptionalString(formData, "context"),
-      source: typeof window === "undefined" ? undefined : window.location.href
+      source: typeof window === "undefined" ? undefined : window.location.href,
+      captchaToken: getOptionalString(formData, "captchaToken")
     } satisfies DemandLead;
     if (!payload.phone && !payload.wechat) {
       throw new Error("请至少填写手机号或微信号，方便平台产品经理跟进");
@@ -175,7 +178,8 @@ function buildLeadPayload(formData: FormData, leadType: LeadPayload["type"]): Le
     budgetRange: getString(formData, "budgetRange"),
     canInvoice: getString(formData, "canInvoice") === "是",
     contactPhone: getString(formData, "contactPhone"),
-    contactWechat: getOptionalString(formData, "contactWechat")
+    contactWechat: getOptionalString(formData, "contactWechat"),
+    captchaToken: getOptionalString(formData, "captchaToken")
   } satisfies ApplicationLead;
   if (payload.direction.length === 0) {
     throw new Error("请至少选择一个擅长方向");

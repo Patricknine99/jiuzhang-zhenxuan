@@ -6,9 +6,11 @@ import { CaseCard } from "@/components/shared/CaseCard";
 import { ProviderCard } from "@/components/shared/ProviderCard";
 import {
   getCasesForIndustry,
+  getCasesForSolution,
   getIndustryCategory,
   getProvidersForIndustry,
-  industryCategories
+  industryCategories,
+  serviceCategories
 } from "@/lib/catalog";
 
 export function generateStaticParams() {
@@ -33,6 +35,10 @@ export default async function IndustryDetailPage({ params }: { params: Promise<{
   if (!category) notFound();
   const providers = getProvidersForIndustry(category);
   const cases = getCasesForIndustry(category);
+  const solutionLinks = serviceCategories.map((service) => ({
+    service,
+    caseCount: getCasesForSolution(service, category).length
+  }));
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-14 md:px-6 md:py-20">
@@ -55,6 +61,22 @@ export default async function IndustryDetailPage({ params }: { params: Promise<{
             <p className="mt-2 font-semibold text-stone-800">{point}</p>
           </div>
         ))}
+      </section>
+
+      <section className="mt-14">
+        <h2 className="text-2xl font-bold">继续按服务类型细分</h2>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {solutionLinks.map(({ service, caseCount }) => (
+            <Link
+              key={service.slug}
+              href={`/solutions/${service.slug}/${category.slug}`}
+              className="rounded-2xl border border-stone-200 bg-white p-5 hover:border-orange-300 hover:bg-amber-50"
+            >
+              <span className="text-sm font-semibold text-stone-900">{service.shortTitle}</span>
+              <span className="mt-2 block text-xs leading-5 text-stone-500">{caseCount} 个相关样例案例</span>
+            </Link>
+          ))}
+        </div>
       </section>
 
       <section className="mt-14">

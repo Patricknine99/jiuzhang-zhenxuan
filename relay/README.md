@@ -9,6 +9,8 @@
 - 前端提交统一 payload 到 `POST /api/leads`
 - relay 校验数据、读取服务端环境变量
 - relay 分发到飞书、企业微信、钉钉
+- relay 提供手机号/邮箱一次性验证码接口：`POST /api/auth/code`、`POST /api/auth/session`
+- relay 预留微信支付接口：`POST /api/payments/wechat/prepay`，未完成签名实现前默认拒绝启用
 - relay 提供 `GET /healthz` / `GET /readyz` 给部署平台做健康检查
 - 数据库接口已保留在 `relay/database.mjs`，当前只返回 no-op 结果，不做持久化
 
@@ -58,6 +60,8 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - `LEAD_CHANNEL_RETRY_COUNT` 控制外部渠道失败重试次数，默认 1 次
 - `LEAD_CHANNEL_RETRY_BASE_MS` 控制重试基础等待时间，默认 250ms
 - 飞书、企微、钉钉密钥只放 relay 环境变量
+- 上线前启用 `LEAD_CAPTCHA_REQUIRED=true`，并同时配置 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 与 `TURNSTILE_SECRET_KEY`
+- 微信支付只允许服务端配置 `WECHAT_PAY_*`，不要把商户号、私钥、API v3 密钥放到 `NEXT_PUBLIC_*`
 
 ## 稳定性机制
 
@@ -66,6 +70,9 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - **基础限流**：内存级 IP 限流用于早期防刷；正式生产可叠加网关或云函数限流。
 - **限流清理**：内存限流桶会定时清理，避免长时间运行后累积过多过期 IP。
 - **请求约束**：限制 JSON body 64KB，并要求 `Content-Type: application/json`。
+- **防机器人**：支持 Cloudflare Turnstile。配置 `LEAD_CAPTCHA_REQUIRED=true` 后，线索和验证码接口都会先验证 token。
+- **字段安全**：relay 会限制关键字段长度、去除控制字符，并校验手机号和来源 URL。
+- **动态验证码**：手机号/邮箱验证码在 relay 内存中按 HMAC 存储，含 TTL 和最大尝试次数；dry-run 才会返回 `devCode`。
 - **渠道超时**：飞书、企微、钉钉单通道默认 8 秒超时，避免单个渠道拖垮整体提交。
 - **渠道重试**：外部渠道失败会按配置进行短重试，降低偶发网络抖动影响。
 - **优雅退出**：监听 `SIGINT` / `SIGTERM`，便于容器或进程管理器平滑停止。
@@ -79,3 +86,19 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - 入驻申请：`team_name`、`direction`、`case_links`、`tech_stack`、`budget_range`、`can_invoice`、`contact_phone`、`contact_wechat`、`created_at`
 
 如果飞书表字段使用中文列名，需要在 `relay/lead-relay.mjs` 的 `toFeishuFields()` 中调整映射。
+
+## 账号与支付接口
+
+### 验证码
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/auth/code \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"phone","identifier":"13800138000","purpose":"login"}'
+```
+
+dry-run 模式会返回 `devCode` 便于本地验证；生产环境不得开启 dry-run，也不会返回验证码明文。
+
+### 微信支付
+
+`POST /api/payments/wechat/prepay` 当前只做安全占位：如果未配置 `WECHAT_PAY_*` 返回 503；如果配置齐全但签名逻辑尚未完成，返回 501。这样可以避免前端误以为支付已可用。

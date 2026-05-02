@@ -30,6 +30,22 @@ if (process.env.LEAD_RELAY_DRY_RUN === "true") {
   console.warn("Warning: LEAD_RELAY_DRY_RUN=true. Production should set it to false.");
 }
 
+if (process.env.LEAD_CAPTCHA_REQUIRED !== "true") {
+  missing.push("LEAD_CAPTCHA_REQUIRED=true");
+}
+
+if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || !process.env.TURNSTILE_SECRET_KEY) {
+  missing.push("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY");
+}
+
+const wechatPayKeys = ["WECHAT_PAY_APP_ID", "WECHAT_PAY_MCH_ID", "WECHAT_PAY_SERIAL_NO", "WECHAT_PAY_PRIVATE_KEY", "WECHAT_PAY_API_V3_KEY"];
+const hasAnyWechatPay = wechatPayKeys.some((key) => Boolean(process.env[key]));
+if (hasAnyWechatPay) {
+  for (const key of wechatPayKeys) {
+    if (!process.env[key]) missing.push(key);
+  }
+}
+
 if (missing.length > 0) {
   console.error(`Missing production env vars:\n${Array.from(new Set(missing)).join("\n")}`);
   process.exit(1);

@@ -31,7 +31,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...getProviders().map((provider) => entry(`/providers/${provider.slug}`, "weekly")),
     ...getCases().map((caseStudy) => entry(`/cases/${caseStudy.slug}`, "weekly")),
     ...serviceCategories.map((category) => entry(`/services/${category.slug}`, "weekly")),
-    ...industryCategories.map((category) => entry(`/industries/${category.slug}`, "weekly"))
+    ...industryCategories.map((category) => entry(`/industries/${category.slug}`, "weekly")),
+    ...serviceCategories.flatMap((service) =>
+      industryCategories.map((industry) => entry(`/solutions/${service.slug}/${industry.slug}`, "weekly"))
+    )
   ];
 }
 

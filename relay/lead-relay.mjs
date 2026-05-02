@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { saveLeadPlaceholder } from "./database.mjs";
 
@@ -9,12 +9,17 @@ const RATE_LIMIT_WINDOW_MS = Number(process.env.LEAD_RATE_LIMIT_WINDOW_MS || 60_
 const RATE_LIMIT_MAX = Number(process.env.LEAD_RATE_LIMIT_MAX || 20);
 const CHANNEL_RETRY_COUNT = Number(process.env.LEAD_CHANNEL_RETRY_COUNT || 1);
 const CHANNEL_RETRY_BASE_MS = Number(process.env.LEAD_CHANNEL_RETRY_BASE_MS || 250);
+const CAPTCHA_REQUIRED = process.env.LEAD_CAPTCHA_REQUIRED === "true";
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "";
+const AUTH_CODE_TTL_MS = Number(process.env.AUTH_CODE_TTL_MS || 5 * 60_000);
+const AUTH_CODE_MAX_ATTEMPTS = Number(process.env.AUTH_CODE_MAX_ATTEMPTS || 5);
 
 const CHANNELS = parseChannels(process.env.LEAD_CHANNELS || "feishu");
 const ALLOWED_ORIGINS = parseList(process.env.LEAD_ALLOWED_ORIGINS || "*");
 const SHARED_SECRET = process.env.LEAD_RELAY_SECRET || "";
 const DRY_RUN = process.env.LEAD_RELAY_DRY_RUN === "true";
 const RATE_LIMIT_BUCKETS = new Map();
+const AUTH_CODE_BUCKETS = new Map();
 
 const server = createServer(async (request, response) => {
   const origin = request.headers.origin || "";
@@ -45,16 +50,57 @@ const server = createServer(async (request, response) => {
         count: CHANNEL_RETRY_COUNT,
         baseMs: CHANNEL_RETRY_BASE_MS
       },
+      captcha: {
+        required: CAPTCHA_REQUIRED,
+        provider: "turnstile",
+        configured: Boolean(TURNSTILE_SECRET_KEY)
+      },
+      auth: {
+        codeTtlMs: AUTH_CODE_TTL_MS,
+        codeMaxAttempts: AUTH_CODE_MAX_ATTEMPTS,
+        oauthReserved: ["wechat", "wecom", "feishu"]
+      },
+      payments: {
+        wechatPayReserved: true,
+        configured: hasWechatPayConfig()
+      },
       requestId
     });
     return;
   }
 
-  if (pathname !== "/api/leads") {
-    sendError(response, 404, "not_found", "Not found", requestId);
+  if (pathname === "/api/leads") {
+    await handleLeadRequest(request, response, origin, requestId);
     return;
   }
 
+  if (pathname === "/api/auth/code") {
+    await handleAuthCodeRequest(request, response, origin, requestId);
+    return;
+  }
+
+  if (pathname === "/api/auth/session") {
+    await handleAuthSessionRequest(request, response, origin, requestId);
+    return;
+  }
+
+  if (pathname === "/api/payments/wechat/prepay") {
+    await handleWechatPrepayRequest(request, response, origin, requestId);
+    return;
+  }
+
+  if (!["/api/leads", "/api/auth/code", "/api/auth/session", "/api/payments/wechat/prepay"].includes(pathname)) {
+    sendError(response, 404, "not_found", "Not found", requestId);
+    return;
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`Lead relay listening on http://127.0.0.1:${PORT}`);
+  console.log(`Channels: ${CHANNELS.join(", ") || "none"}${DRY_RUN ? " (dry run)" : ""}`);
+});
+
+async function handleLeadRequest(request, response, origin, requestId) {
   if (request.method !== "POST") {
     response.setHeader("Allow", "POST, OPTIONS");
     sendError(response, 405, "method_not_allowed", "Method is not allowed", requestId);
@@ -85,6 +131,7 @@ const server = createServer(async (request, response) => {
 
   try {
     const body = await readJsonBody(request);
+    await verifyCaptchaToken(body.captchaToken, getClientKey(request), requestId);
     const payload = normalizeLeadPayload(body);
     const results = await submitLeadToChannels(payload, CHANNELS);
     const requiredResults = results.filter((result) => result.channel !== "database");
@@ -100,12 +147,7 @@ const server = createServer(async (request, response) => {
   } catch (error) {
     sendError(response, 400, "bad_request", error instanceof Error ? error.message : "Invalid request", requestId);
   }
-});
-
-server.listen(PORT, () => {
-  console.log(`Lead relay listening on http://127.0.0.1:${PORT}`);
-  console.log(`Channels: ${CHANNELS.join(", ") || "none"}${DRY_RUN ? " (dry run)" : ""}`);
-});
+}
 
 async function submitLeadToChannels(payload, channels) {
   const databaseResult = await saveLeadPlaceholder(payload);
@@ -147,6 +189,136 @@ async function submitLeadToChannels(payload, channels) {
     })
   );
   return [databaseResult, ...channelResults];
+}
+
+async function handleAuthCodeRequest(request, response, origin, requestId) {
+  if (request.method !== "POST") {
+    response.setHeader("Allow", "POST, OPTIONS");
+    sendError(response, 405, "method_not_allowed", "Method is not allowed", requestId);
+    return;
+  }
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  if (!isJsonRequest(request)) {
+    sendError(response, 415, "unsupported_media_type", "Content-Type must be application/json", requestId);
+    return;
+  }
+  const rateLimit = consumeRateLimit(`auth:${getClientKey(request)}`);
+  if (!rateLimit.ok) {
+    response.setHeader("Retry-After", String(Math.ceil(rateLimit.retryAfterMs / 1000)));
+    sendError(response, 429, "rate_limited", "Too many auth requests, please retry later", requestId);
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(request);
+    await verifyCaptchaToken(body.captchaToken, getClientKey(request), requestId);
+    const method = normalizeAuthMethod(body.method);
+    const identifier = normalizeAuthIdentifier(method, body.identifier);
+    const purpose = body.purpose === "register" ? "register" : "login";
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    AUTH_CODE_BUCKETS.set(getAuthCodeKey(method, identifier, purpose), {
+      codeHash: signValue(code),
+      expiresAt: Date.now() + AUTH_CODE_TTL_MS,
+      attempts: 0
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      requestId,
+      expiresInSeconds: Math.floor(AUTH_CODE_TTL_MS / 1000),
+      delivery: DRY_RUN ? "dry_run" : "reserved_provider",
+      devCode: DRY_RUN ? code : undefined,
+      message: DRY_RUN ? "Dry-run auth code generated. Do not expose devCode in production." : "Auth code accepted by relay."
+    });
+  } catch (error) {
+    sendError(response, 400, "bad_request", error instanceof Error ? error.message : "Invalid auth request", requestId);
+  }
+}
+
+async function handleAuthSessionRequest(request, response, origin, requestId) {
+  if (request.method !== "POST") {
+    response.setHeader("Allow", "POST, OPTIONS");
+    sendError(response, 405, "method_not_allowed", "Method is not allowed", requestId);
+    return;
+  }
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  if (!isJsonRequest(request)) {
+    sendError(response, 415, "unsupported_media_type", "Content-Type must be application/json", requestId);
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(request);
+    const method = normalizeAuthMethod(body.method);
+    const identifier = normalizeAuthIdentifier(method, body.identifier);
+    const purpose = body.purpose === "register" ? "register" : "login";
+    const role = body.role === "provider" ? "provider" : "buyer";
+    const key = getAuthCodeKey(method, identifier, purpose);
+    const stored = AUTH_CODE_BUCKETS.get(key);
+
+    if (!stored || Date.now() > stored.expiresAt) {
+      AUTH_CODE_BUCKETS.delete(key);
+      throw new Error("验证码已过期，请重新获取");
+    }
+    if (stored.attempts >= AUTH_CODE_MAX_ATTEMPTS) {
+      AUTH_CODE_BUCKETS.delete(key);
+      throw new Error("验证码尝试次数过多，请重新获取");
+    }
+    stored.attempts += 1;
+    if (!isValidSecret(signValue(String(body.code || "")), stored.codeHash)) {
+      throw new Error("验证码不正确");
+    }
+    AUTH_CODE_BUCKETS.delete(key);
+
+    sendJson(response, 200, {
+      ok: true,
+      requestId,
+      account: {
+        id: `acct_${Date.now().toString(36)}_${signValue(identifier).slice(0, 8)}`,
+        method,
+        identifier,
+        displayName: method === "email" ? identifier.split("@")[0] : `${identifier.slice(0, 3)}****${identifier.slice(-4)}`,
+        role,
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    sendError(response, 400, "bad_request", error instanceof Error ? error.message : "Invalid auth request", requestId);
+  }
+}
+
+async function handleWechatPrepayRequest(request, response, origin, requestId) {
+  if (request.method !== "POST") {
+    response.setHeader("Allow", "POST, OPTIONS");
+    sendError(response, 405, "method_not_allowed", "Method is not allowed", requestId);
+    return;
+  }
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  if (!isJsonRequest(request)) {
+    sendError(response, 415, "unsupported_media_type", "Content-Type must be application/json", requestId);
+    return;
+  }
+
+  await readJsonBody(request);
+  sendJson(response, hasWechatPayConfig() ? 501 : 503, {
+    ok: false,
+    requestId,
+    error: {
+      code: hasWechatPayConfig() ? "wechat_pay_not_implemented" : "wechat_pay_not_configured",
+      message: hasWechatPayConfig()
+        ? "WeChat Pay configuration is present, but signed prepay request implementation is intentionally not enabled yet."
+        : "WeChat Pay is reserved but not configured. Set WECHAT_PAY_* server-side variables before enabling payments."
+    }
+  });
 }
 
 async function submitWithRetry(channel, submit, timeoutMessage) {
@@ -263,45 +435,45 @@ function normalizeLeadPayload(body) {
   }
 
   if (body.type === "demand") {
-    requireString(body.company, "company");
-    requireString(body.contactName, "contactName");
-    requireString(body.industry, "industry");
-    requireString(body.painPoint, "painPoint");
-    requireString(body.budgetRange, "budgetRange");
-    requireString(body.expectedDelivery, "expectedDelivery");
+    requireString(body.company, "company", 80);
+    requireString(body.contactName, "contactName", 40);
+    requireString(body.industry, "industry", 40);
+    requireString(body.painPoint, "painPoint", 2000);
+    requireString(body.budgetRange, "budgetRange", 40);
+    requireString(body.expectedDelivery, "expectedDelivery", 40);
     return {
       type: "demand",
-      company: body.company.trim(),
-      contactName: body.contactName.trim(),
-      industry: body.industry.trim(),
-      painPoint: body.painPoint.trim(),
-      budgetRange: body.budgetRange.trim(),
-      expectedDelivery: body.expectedDelivery.trim(),
+      company: cleanString(body.company, 80),
+      contactName: cleanString(body.contactName, 40),
+      industry: cleanString(body.industry, 40),
+      painPoint: cleanString(body.painPoint, 2000),
+      budgetRange: cleanString(body.budgetRange, 40),
+      expectedDelivery: cleanString(body.expectedDelivery, 40),
       needRecommend: Boolean(body.needRecommend),
-      phone: optionalString(body.phone),
-      wechat: optionalString(body.wechat),
-      context: optionalString(body.context),
-      source: optionalString(body.source)
+      phone: optionalPhone(body.phone, "phone"),
+      wechat: optionalString(body.wechat, 80),
+      context: optionalString(body.context, 200),
+      source: optionalUrl(body.source)
     };
   }
 
   if (body.type === "application") {
-    requireString(body.teamName, "teamName");
+    requireString(body.teamName, "teamName", 80);
     requireArray(body.direction, "direction");
-    requireString(body.caseLinks, "caseLinks");
-    requireString(body.techStack, "techStack");
-    requireString(body.budgetRange, "budgetRange");
-    requireString(body.contactPhone, "contactPhone");
+    requireString(body.caseLinks, "caseLinks", 2000);
+    requireString(body.techStack, "techStack", 1000);
+    requireString(body.budgetRange, "budgetRange", 40);
+    requireString(body.contactPhone, "contactPhone", 30);
     return {
       type: "application",
-      teamName: body.teamName.trim(),
-      direction: body.direction.map((item) => String(item).trim()).filter(Boolean),
-      caseLinks: body.caseLinks.trim(),
-      techStack: body.techStack.trim(),
-      budgetRange: body.budgetRange.trim(),
+      teamName: cleanString(body.teamName, 80),
+      direction: body.direction.map((item) => cleanString(String(item), 40)).filter(Boolean).slice(0, 12),
+      caseLinks: cleanString(body.caseLinks, 2000),
+      techStack: cleanString(body.techStack, 1000),
+      budgetRange: cleanString(body.budgetRange, 40),
       canInvoice: Boolean(body.canInvoice),
-      contactPhone: body.contactPhone.trim(),
-      contactWechat: optionalString(body.contactWechat)
+      contactPhone: requirePhone(body.contactPhone, "contactPhone"),
+      contactWechat: optionalString(body.contactWechat, 80)
     };
   }
 
@@ -483,6 +655,13 @@ function cleanupRateLimitBuckets() {
   }
 }
 
+function cleanupAuthCodeBuckets() {
+  const now = Date.now();
+  for (const [key, bucket] of AUTH_CODE_BUCKETS.entries()) {
+    if (now > bucket.expiresAt) AUTH_CODE_BUCKETS.delete(key);
+  }
+}
+
 function getRequestId() {
   return `lead_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -516,9 +695,73 @@ function requireEnv(key) {
   return value;
 }
 
-function requireString(value, key) {
+async function verifyCaptchaToken(token, remoteIp, requestId) {
+  if (!CAPTCHA_REQUIRED) return;
+  if (!TURNSTILE_SECRET_KEY) throw new Error("Captcha is required but TURNSTILE_SECRET_KEY is missing");
+  if (typeof token !== "string" || !token.trim()) throw new Error("请先完成人机校验");
+
+  const response = await withTimeout(
+    fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret: TURNSTILE_SECRET_KEY,
+        response: token,
+        remoteip: remoteIp,
+        idempotency_key: requestId
+      })
+    }),
+    REQUEST_TIMEOUT_MS,
+    "Captcha verification timed out"
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) throw new Error("人机校验未通过，请刷新后重试");
+}
+
+function normalizeAuthMethod(value) {
+  if (value === "email" || value === "phone") return value;
+  throw new Error("Unsupported auth method");
+}
+
+function normalizeAuthIdentifier(method, value) {
+  if (typeof value !== "string") throw new Error("Missing auth identifier");
+  const normalized = method === "email" ? value.trim().toLowerCase() : value.replace(/\s|-/g, "").trim();
+  if (method === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error("邮箱格式不正确");
+  if (method === "phone" && !/^1[3-9]\d{9}$/.test(normalized)) throw new Error("手机号格式不正确");
+  return normalized;
+}
+
+function getAuthCodeKey(method, identifier, purpose) {
+  return `${purpose}:${method}:${identifier}`;
+}
+
+function signValue(value) {
+  return createHmac("sha256", SHARED_SECRET || "jiuzhang-dev-secret").update(value).digest("hex");
+}
+
+function hasWechatPayConfig() {
+  return Boolean(
+    process.env.WECHAT_PAY_APP_ID &&
+      process.env.WECHAT_PAY_MCH_ID &&
+      process.env.WECHAT_PAY_SERIAL_NO &&
+      process.env.WECHAT_PAY_PRIVATE_KEY &&
+      process.env.WECHAT_PAY_API_V3_KEY
+  );
+}
+
+function cleanString(value, maxLength) {
+  return String(value)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function requireString(value, key, maxLength = 500) {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`Missing field: ${key}`);
+  }
+  if (cleanString(value, maxLength + 1).length > maxLength) {
+    throw new Error(`Field is too long: ${key}`);
   }
 }
 
@@ -528,8 +771,30 @@ function requireArray(value, key) {
   }
 }
 
-function optionalString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+function requirePhone(value, key) {
+  const normalized = typeof value === "string" ? value.replace(/\s|-/g, "").trim() : "";
+  if (!/^1[3-9]\d{9}$/.test(normalized)) throw new Error(`Invalid phone field: ${key}`);
+  return normalized;
+}
+
+function optionalPhone(value, key) {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  return requirePhone(value, key);
+}
+
+function optionalUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.toString().slice(0, 500);
+  } catch {
+    return undefined;
+  }
+}
+
+function optionalString(value, maxLength = 500) {
+  return typeof value === "string" && value.trim() ? cleanString(value, maxLength) : undefined;
 }
 
 function shutdown(signal) {
@@ -541,6 +806,7 @@ function shutdown(signal) {
 }
 
 setInterval(cleanupRateLimitBuckets, Math.min(60_000, RATE_LIMIT_WINDOW_MS)).unref();
+setInterval(cleanupAuthCodeBuckets, Math.min(60_000, AUTH_CODE_TTL_MS)).unref();
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

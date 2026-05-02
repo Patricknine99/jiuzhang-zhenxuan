@@ -273,3 +273,34 @@
 - **用户体验**：已完成全局 loading、表单提交 spinner、AI 诊断等待态、智能客服等待态、登录/验证码处理中、表单草稿保存、成功页提交结果展示、账号页最近提交记录。
 - **灰度与验证**：已完成 `verify:data`、`smoke:routes`、`check:env`、`relay:check` 等脚本；每次重大改动均已写入 SPEC 并提交 Git。
 - **Git 保存点**：已有 `72214fc`、`41936a5`、`9863988`、`9ba40e4`、`733acc2`，本批次将继续提交新的保存点。
+
+## 13. ChatGPT 修改记录（2026-05-02 安全与三级页面批次）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **本批最高优先级判断**：
+  1. 账号验证码此前仍偏演示，属于上线前最高安全风险。
+  2. 表单仅有蜜罐和限流，缺少可强制开启的防机器人验证码。
+  3. 微信支付未明确接口状态，容易被误认为已可用。
+  4. 二级页面已完成，但缺少“服务类型 × 行业”的三级承接页。
+- **ChatGPT 修改**：
+  1. 新增 `components/shared/TurnstileField.tsx`，前端通过 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 显示 Cloudflare Turnstile。
+  2. 更新 `components/shared/StaticForm.tsx`，线索表单提交 `captchaToken`，继续保留隐藏蜜罐。
+  3. 更新 `relay/lead-relay.mjs`，新增 Turnstile 服务端验证、字段长度限制、控制字符清理、手机号校验、来源 URL 校验。
+  4. 更新 `relay/lead-relay.mjs`，新增 `/api/auth/code` 与 `/api/auth/session`，手机号/邮箱验证码在服务端按 HMAC 存储，含 TTL 与最大尝试次数；dry-run 才返回 `devCode`。
+  5. 更新 `components/auth/AuthPanel.tsx`，手机号和邮箱统一改为验证码登录/注册；配置 `NEXT_PUBLIC_AUTH_RELAY_URL` 后走服务端验证码，未配置时仅保留静态演示验证码 `123456`。
+  6. 更新 `relay/lead-relay.mjs`，新增 `/api/payments/wechat/prepay` 安全占位；未配置微信支付返回 503，配置齐全但签名实现未完成返回 501。
+  7. 新增 `/solutions/[service]/[industry]` 三级方案页，并从服务类型页、行业页进入；静态导出 16 个组合页。
+  8. 更新 `.env.example`、`scripts/check-env.mjs`、`docs/integrations.md`、`relay/README.md`，补充 Turnstile、验证码、微信支付生产配置要求。
+- **接口预留状态**：
+  1. 飞书、企业微信、钉钉线索接口已在 relay 中保留并 dry-run 验证。
+  2. 微信、企业微信、飞书 OAuth 登录入口仍保持禁用预留，等待真实开放平台应用参数。
+  3. 微信支付已新增后端安全占位，但真实签名、回调验签、订单幂等、退款权限仍未启用。
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run verify:data` 通过。
+  3. `npm run lint` 通过。
+  4. `npm run build` 通过，静态生成 53 个页面。
+  5. relay dry-run 验证通过：`GET /healthz` 返回 captcha/auth/payments 状态；`POST /api/leads` 企业需求与服务商入驻均返回 `ok: true`；`POST /api/auth/code` 返回 dry-run `devCode`；`POST /api/auth/session` 可用正确验证码换取账号；错误验证码被拒绝。
+  6. `LEAD_CAPTCHA_REQUIRED=true` 且缺少 token 时，线索提交按预期返回“请先完成人机校验”。
+  7. 微信支付占位接口在未配置 `WECHAT_PAY_*` 时按预期返回 503。

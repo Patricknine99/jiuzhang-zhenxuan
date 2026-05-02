@@ -13,6 +13,7 @@ export type DemandLead = {
   wechat?: string;
   context?: string;
   source?: string;
+  captchaToken?: string;
 };
 
 export type ApplicationLead = {
@@ -25,6 +26,7 @@ export type ApplicationLead = {
   canInvoice: boolean;
   contactPhone: string;
   contactWechat?: string;
+  captchaToken?: string;
 };
 
 export type LeadPayload = DemandLead | ApplicationLead;
