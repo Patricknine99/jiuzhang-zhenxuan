@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HumanVerificationField } from "@/components/shared/HumanVerificationField";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { isValidPhone, normalizePhone } from "@/lib/auth";
+import { isValidPhone, normalizePhone, authTokenStorageKey } from "@/lib/auth";
 import type { ApplicationLead, DemandLead, LeadPayload } from "@/lib/integrations";
 
 type RelayResponse = {
@@ -192,9 +192,14 @@ function buildLeadPayload(formData: FormData, leadType: LeadPayload["type"]): Le
 }
 
 function buildRelayHeaders() {
-  return {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json"
   };
+  if (typeof window !== "undefined") {
+    const token = window.localStorage.getItem(authTokenStorageKey);
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 function sanitizeInput(input: string): string {

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, MessageCircle, Phone, UserRound } from "lucide-react";
 import { HumanVerificationField } from "@/components/shared/HumanVerificationField";
-import { authStorageKey, createLocalAccount, getOrCreateAuthDeviceId, isValidEmail, isValidPhone, validatePassword, type LocalAccount } from "@/lib/auth";
+import { authStorageKey, authTokenStorageKey, createLocalAccount, getOrCreateAuthDeviceId, isValidEmail, isValidPhone, validatePassword, type LocalAccount } from "@/lib/auth";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 type AuthMode = "login" | "register";
@@ -18,6 +18,7 @@ type AuthRelayResponse = {
   ok?: boolean;
   requestId?: string;
   devCode?: string;
+  token?: string;
   account?: LocalAccount;
   requiresVerification?: boolean;
   message?: string;
@@ -134,6 +135,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
               return;
             }
             window.localStorage.setItem(authStorageKey, JSON.stringify(result.account));
+            if (result.token) window.localStorage.setItem(authTokenStorageKey, result.token);
             setMessage(isRegister ? "注册成功，正在进入账号页。" : "登录成功，正在进入账号页。");
             window.setTimeout(() => router.push("/account"), 350);
           } catch (caught) {
@@ -274,7 +276,7 @@ async function verifyAuthSession(input: {
   role: LocalAccount["role"];
   captchaToken?: string;
   deviceId: string;
-}): Promise<{ account: LocalAccount; requiresVerification?: false } | { requiresVerification: true }> {
+}): Promise<{ account: LocalAccount; token?: string; requiresVerification?: false } | { requiresVerification: true }> {
   const relayUrl = process.env.NEXT_PUBLIC_AUTH_RELAY_URL;
   if (!relayUrl) {
     await delay(420);
@@ -307,7 +309,7 @@ async function verifyAuthSession(input: {
   const body = (await response.json().catch(() => null)) as AuthRelayResponse | null;
   if (response.status === 202 || body?.requiresVerification) return { requiresVerification: true };
   if (!response.ok || body?.ok === false || !body?.account) throw new Error(body?.error?.message || body?.message || "登录验证失败");
-  return { account: body.account };
+  return { account: body.account, token: body.token };
 }
 
 function getCaptchaToken(form: HTMLFormElement | null) {

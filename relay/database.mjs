@@ -6,16 +6,18 @@ import { redis, setAuthCode, getAuthCode, incrementAuthCodeAttempts, deleteAuthC
  * @param {object} payload
  * @param {string} requestId
  * @param {string[]} channels
+ * @param {string} [accountId]
  */
-export async function saveLead(payload, requestId, channels) {
+export async function saveLead(payload, requestId, channels, accountId) {
   const result = await query(
-    `INSERT INTO leads (type, request_id, payload, status, channels, results)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO leads (type, request_id, payload, status, channels, results, account_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (request_id) DO UPDATE SET
        payload = EXCLUDED.payload,
        status = EXCLUDED.status,
        channels = EXCLUDED.channels,
        results = EXCLUDED.results,
+       account_id = COALESCE(EXCLUDED.account_id, leads.account_id),
        updated_at = NOW()
      RETURNING id`,
     [
@@ -24,7 +26,8 @@ export async function saveLead(payload, requestId, channels) {
       JSON.stringify(payload),
       "pending",
       JSON.stringify(channels),
-      JSON.stringify([])
+      JSON.stringify([]),
+      accountId || null
     ]
   );
   return { ok: true, channel: "database", message: `Lead saved with id ${result.rows[0].id}` };
@@ -51,6 +54,35 @@ export async function getRecentLeads(limit = 50) {
     `SELECT type, request_id, status, payload, results, created_at
      FROM leads ORDER BY created_at DESC LIMIT $1`,
     [limit]
+  );
+  return result.rows.map((row) => ({
+    type: row.type,
+    requestId: row.request_id,
+    status: row.status,
+    ok: row.status === "sent",
+    partialFailure: row.results && row.results.some((r) => !r.ok) && row.results.some((r) => r.ok),
+    submittedAt: row.created_at,
+    results: row.results || []
+  }));
+}
+
+/**
+ * Get leads by account ID and type.
+ * @param {string} accountId
+ * @param {string} [type] - "demand" or "application"
+ * @param {number} [limit]
+ */
+export async function getLeadsByAccount(accountId, type, limit = 50) {
+  const clauses = [`account_id = $1`];
+  const values = [accountId];
+  if (type) {
+    clauses.push(`type = $2`);
+    values.push(type);
+  }
+  const result = await query(
+    `SELECT type, request_id, status, payload, results, created_at
+     FROM leads WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC LIMIT $${values.length + 1}`,
+    [...values, limit]
   );
   return result.rows.map((row) => ({
     type: row.type,

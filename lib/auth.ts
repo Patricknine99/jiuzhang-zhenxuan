@@ -10,6 +10,7 @@ export type LocalAccount = {
 };
 
 export const authStorageKey = "jiuzhang:account";
+export const authTokenStorageKey = "jiuzhang:auth-token";
 export const authDeviceStorageKey = "jiuzhang:auth-device-id";
 
 export function normalizeEmail(value: string) {

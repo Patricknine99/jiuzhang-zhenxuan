@@ -21,6 +21,7 @@ export function Navbar() {
                 title: "需求方工作台",
                 links: [
                   { href: "/buyers", label: "需求方入口", description: "从诊断、匹配到验收的完整路径。" },
+                  { href: "/buyers/dashboard", label: "我的工作台", description: "已登录需求方查看提交记录与跟进状态。" },
                   { href: "/login?role=buyer", label: "需求方登录", description: "进入企业买家系统，查看需求与跟进记录。" },
                   { href: "/diagnosis", label: "AI 需求诊断", description: "先把模糊业务问题拆成可执行方案。" },
                   { href: "/post-demand", label: "发布需求", description: "提交预算、周期和业务痛点，等待平台跟进。" }

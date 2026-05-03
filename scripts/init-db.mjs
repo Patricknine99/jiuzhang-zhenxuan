@@ -116,10 +116,16 @@ async function init() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
 
+    // Migrate: add account_id column for existing tables
+    await client.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS account_id VARCHAR(32)`);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_leads_type ON leads(type);
       CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
       CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_leads_account ON leads(account_id);
     `);
 
     await client.query(`

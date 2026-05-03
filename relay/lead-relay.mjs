@@ -12,6 +12,7 @@ import {
   getAdminAccount,
   verifyAuthCode as dbVerifyAuthCode,
   writeAuditLog,
+  getLeadsByAccount,
   closeDatabaseConnections
 } from "./database.mjs";
 import { consumeRateLimitRedis, checkSendCooldown, redis } from "./redis.mjs";
@@ -31,6 +32,7 @@ const CAPTCHA_SECRET_KEY = process.env.CAPTCHA_SECRET_KEY || "";
 const AUTH_CODE_TTL_MS = Number(process.env.AUTH_CODE_TTL_MS || 5 * 60_000);
 const AUTH_CODE_MAX_ATTEMPTS = Number(process.env.AUTH_CODE_MAX_ATTEMPTS || 5);
 const ADMIN_SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 8 * 60 * 60_000);
+const AUTH_SESSION_TTL_MS = Number(process.env.AUTH_SESSION_TTL_MS || 24 * 60 * 60_000);
 const SEND_CODE_COOLDOWN_MS = 60_000;
 
 const CHANNELS = parseChannels(process.env.LEAD_CHANNELS || "feishu");
@@ -120,6 +122,11 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (pathname === "/api/leads/mine" && request.method === "GET") {
+    await handleMyLeadsRequest(request, response, origin, requestId);
+    return;
+  }
+
   if (pathname === "/api/payments/wechat/prepay") {
     await handleWechatPrepayRequest(request, response, origin, requestId);
     return;
@@ -178,8 +185,20 @@ async function handleLeadRequest(request, response, origin, requestId) {
     await verifyCaptchaToken(body.captchaToken, getClientKey(request), requestId);
     const payload = normalizeLeadPayload(body);
 
+    // Extract account context from auth token if present
+    let accountId;
+    try {
+      const userToken = getBearerToken(request);
+      if (userToken) {
+        const userPayload = verifyUserToken(userToken);
+        accountId = userPayload.account.accountId;
+      }
+    } catch {
+      // Token optional — leads can be submitted without authentication
+    }
+
     // Save to database first
-    const dbResult = await saveLead(payload, requestId, CHANNELS);
+    const dbResult = await saveLead(payload, requestId, CHANNELS, accountId);
 
     const results = await submitLeadToChannels(payload, CHANNELS, requestId, dbResult);
     const requiredResults = results.filter((result) => result.channel !== "database");
@@ -343,6 +362,7 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
         ok: true,
         requestId,
         trustedDevice: true,
+        token: signUserToken(account),
         account: toPublicAccount(account)
       });
       return;
@@ -371,10 +391,29 @@ async function handleAuthSessionRequest(request, response, origin, requestId) {
       ok: true,
       requestId,
       trustedDevice: true,
+      token: signUserToken(existingAccount),
       account: toPublicAccount(existingAccount)
     });
   } catch (error) {
     sendError(response, 400, "bad_request", error instanceof Error ? error.message : "Invalid auth request", requestId);
+  }
+}
+
+async function handleMyLeadsRequest(request, response, origin, requestId) {
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  try {
+    const token = getBearerToken(request);
+    if (!token) throw new Error("未登录或会话已过期");
+    const payload = verifyUserToken(token);
+    const { accountId, role } = payload.account;
+    const type = getSearchParam(request.url, "type") || role === "provider" ? "application" : "demand";
+    const leads = await getLeadsByAccount(accountId, type, 50);
+    sendJson(response, 200, { ok: true, requestId, accountId, type, leads });
+  } catch (error) {
+    sendError(response, 401, "invalid_session", error instanceof Error ? error.message : "Invalid session", requestId);
   }
 }
 
@@ -767,6 +806,14 @@ function getPathname(url) {
   }
 }
 
+function getSearchParam(url, key) {
+  try {
+    return new URL(url || "/", "http://relay.local").searchParams.get(key) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isJsonRequest(request) {
   const contentType = request.headers["content-type"];
   return typeof contentType === "string" && contentType.toLowerCase().includes("application/json");
@@ -899,6 +946,21 @@ function verifyAdminToken(token) {
   if (!isValidSecret(signature, signValue(encoded))) throw new Error("管理员会话签名无效");
   const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
   if (!payload?.account || Date.now() > payload.expiresAt) throw new Error("管理员会话已过期");
+  return payload;
+}
+
+function signUserToken(account) {
+  const payload = { account: { accountId: account.id, role: account.role }, expiresAt: Date.now() + AUTH_SESSION_TTL_MS };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${signValue(encoded)}`;
+}
+
+function verifyUserToken(token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) throw new Error("会话缺失");
+  const [encoded, signature] = token.split(".");
+  if (!isValidSecret(signature, signValue(encoded))) throw new Error("会话签名无效");
+  const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+  if (!payload?.account?.accountId || Date.now() > payload.expiresAt) throw new Error("会话已过期");
   return payload;
 }
 
