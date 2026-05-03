@@ -16,10 +16,10 @@ export default function CreatorsPage() {
           <div>
             <p className="text-sm font-semibold text-[var(--color-brand)]">供给方入口</p>
             <h1 className="mt-3 text-3xl font-bold leading-tight md:text-5xl">
-              把 AI 能力包装成企业愿意采购的服务
+              把 AI 能力包装成企业愿意采购的产品或服务
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-600">
-              适合 AI 创作者、独立工作室、OPC 和自动化顾问。平台关注的不是单张作品，而是真实案例、报价边界、响应 SLA、版权声明和可复用交付流程。
+              适合 AI 创作者、独立工作室、硬件厂商、OPC 和自动化顾问。平台关注的不是单张作品，而是真实案例、报价边界、响应 SLA、版权声明和可复用交付流程。
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/register?role=provider" className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-6 py-3.5 font-semibold text-stone-700 hover:bg-white">

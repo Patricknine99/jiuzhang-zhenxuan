@@ -49,5 +49,22 @@
     "aiLabel": "含 AI 生成内容标识",
     "featured": false,
     "sortOrder": 30
+  },
+  {
+    "slug": "ai-voice-command-box-children",
+    "title": "某儿童品牌：AI 语音指令箱方案定制与小批量交付",
+    "providerSlug": "lingxi-ai-hardware",
+    "providerName": "灵犀智能硬件",
+    "category": "AI 硬件",
+    "industry": ["教育", "制造"],
+    "background": "客户是一家儿童教育品牌，计划推出一款面向学龄前儿童的 AI 语音互动玩具，需要从 ID 设计、硬件选型到量产测试的全流程支持。",
+    "problem": "团队有产品定义和渠道，但缺乏端侧 AI 硬件经验——不知道选什么芯片模组、如何做语音降噪、怎样控制 BOM 成本。",
+    "solution": "基于 ESP32-S3 + 离线语音识别模组搭建原型，定制儿童交互场景的语义理解模型，完成 3D 打印外壳验证和小批量试产。",
+    "process": "产品定义 → 硬件方案选型 → ID 设计 → 3D 打印原型 → 语音交互调优 → 小批量试产（200 台）→ 量产交接文档。",
+    "roiText": "BOM 成本控制在 ¥120 以内 · 首批 200 台完成交付",
+    "budgetText": "约 ¥180,000",
+    "aiLabel": "端侧 AI 语音交互",
+    "featured": false,
+    "sortOrder": 40
   }
 ]

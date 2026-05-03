@@ -20,10 +20,10 @@ export default function BuyersPage() {
           <div>
             <p className="text-sm font-semibold text-[var(--color-brand)]">需求方入口</p>
             <h1 className="mt-3 text-3xl font-bold leading-tight md:text-5xl">
-              从一句业务问题开始，找到能交付的 AI 服务商
+              从一句业务问题开始，找到能交付的 AI 解决方案
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-600">
-              适合企业、品牌方、中小商家。你不需要先懂模型、工具和技术栈，只需要说清楚业务目标、预算和时间，平台会帮你拆解需求、匹配服务商并给出验收边界。
+              适合企业、品牌方、中小商家。你不需要先懂模型、工具和技术栈，只需要说清楚业务目标、预算和时间，平台会帮你拆解需求、匹配供给方并给出验收边界。
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/register?role=buyer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-6 py-3.5 font-semibold text-stone-700 hover:bg-white">

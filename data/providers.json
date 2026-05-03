@@ -99,5 +99,28 @@
     "responseTime": "48h 内响应",
     "services": ["内容生产流程", "品牌语料库", "营销素材批量生成"],
     "reviews": ["交付物不浮夸，能真正进入编辑和投放流程。"]
+  },
+  {
+    "slug": "lingxi-ai-hardware",
+    "name": "灵犀智能硬件",
+    "level": "L2",
+    "levelLabel": "商业验证",
+    "tags": ["AI 硬件", "智能设备", "AIoT", "边缘计算"],
+    "industry": ["制造", "教育", "本地生活"],
+    "deliveryMin": 30,
+    "deliveryMax": 90,
+    "budgetMin": 50000,
+    "budgetMax": 500000,
+    "rating": 4.8,
+    "caseCount": 7,
+    "avatarUrl": "",
+    "description": "专注 AI 玩具、智能音箱和 AIoT 边缘设备的方案设计、原型验证与小批量交付，覆盖语音交互、视觉识别和端侧推理场景。",
+    "techStack": ["ESP32", "树莓派", "TensorFlow Lite", "语音识别模组", "3D 打印"],
+    "canInvoice": true,
+    "featured": false,
+    "sortOrder": 50,
+    "responseTime": "72h 内响应",
+    "services": ["AI 玩具方案定制", "智能音箱 ODM", "AIoT 边缘设备", "端侧 AI 模组集成"],
+    "reviews": ["硬件方案落地的项目管理很专业，从 ID 设计到量产测试都有明确节点。", "对接供应链资源丰富，帮我们省了不少选型时间。"]
   }
 ]

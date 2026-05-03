@@ -53,6 +53,15 @@ export const serviceCategories: ServiceCategory[] = [
     tags: ["企业知识库", "私有数据微调", "RAG 架构", "品牌知识库"],
     caseCategories: ["企业 AI"],
     outcomes: ["提升检索效率", "保留文档溯源", "减少新人培训成本"]
+  },
+  {
+    slug: "ai-hardware-devices",
+    title: "AI 硬件与智能设备",
+    shortTitle: "AI 硬件",
+    description: "适合 AI 玩具、智能音箱、AIoT 设备、机器人、AI 芯片模组等硬件产品的设计、定制与批量交付。",
+    tags: ["AI 硬件", "智能设备", "AIoT", "机器人", "AI 芯片模组", "边缘计算"],
+    caseCategories: ["AI 硬件"],
+    outcomes: ["产品方案落地", "供应链对接", "合规认证支持"]
   }
 ];
 

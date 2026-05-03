@@ -31,7 +31,7 @@ export default function JoinPage() {
         </FieldGroup>
         <FieldGroup label="擅长方向" required>
           <div className="flex flex-wrap gap-2">
-            {["企业知识库", "客服 Agent", "自动化流程", "商品图", "短视频", "数字人", "内容创作", "RAG 架构"].map((item) => (
+            {["企业知识库", "客服 Agent", "自动化流程", "商品图", "短视频", "数字人", "内容创作", "RAG 架构", "AI 硬件产品", "智能设备/IoT", "机器人", "AI 芯片/模组"].map((item) => (
               <label key={item} className="rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-600 has-[:checked]:border-orange-300 has-[:checked]:bg-amber-100 has-[:checked]:text-amber-900">
                 <input className="sr-only" type="checkbox" name="direction" value={item} />
                 {item}
@@ -40,7 +40,7 @@ export default function JoinPage() {
           </div>
         </FieldGroup>
         <FieldGroup label="已有案例链接（至少 3 个）" required>
-          <textarea className="field min-h-28" name="caseLinks" required placeholder="每行一个案例链接，附简短说明更好" />
+          <textarea className="field min-h-28" name="caseLinks" required placeholder="每行一个案例链接或产品说明，附简短介绍更好" />
         </FieldGroup>
         <FieldGroup label="技术栈" required>
           <textarea className="field min-h-24" name="techStack" required />
