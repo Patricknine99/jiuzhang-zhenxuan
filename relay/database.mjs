@@ -61,6 +61,7 @@ export async function getRecentLeads(limit = 50) {
     status: row.status,
     ok: row.status === "sent",
     partialFailure: row.results && row.results.some((r) => !r.ok) && row.results.some((r) => r.ok),
+    payload: row.payload || {},
     submittedAt: row.created_at,
     results: row.results || []
   }));
@@ -90,6 +91,7 @@ export async function getLeadsByAccount(accountId, type, limit = 50) {
     status: row.status,
     ok: row.status === "sent",
     partialFailure: row.results && row.results.some((r) => !r.ok) && row.results.some((r) => r.ok),
+    payload: row.payload || {},
     submittedAt: row.created_at,
     results: row.results || []
   }));

@@ -38,6 +38,7 @@ const SEND_CODE_COOLDOWN_MS = 60_000;
 const CHANNELS = parseChannels(process.env.LEAD_CHANNELS || "feishu");
 const ALLOWED_ORIGINS = parseList(process.env.LEAD_ALLOWED_ORIGINS || "*");
 const SHARED_SECRET = process.env.LEAD_RELAY_SECRET || "";
+const REQUIRE_CLIENT_SECRET = process.env.LEAD_REQUIRE_CLIENT_SECRET === "true";
 const DRY_RUN = process.env.LEAD_RELAY_DRY_RUN === "true";
 let isShuttingDown = false;
 
@@ -81,6 +82,7 @@ const server = createServer(async (request, response) => {
       database: "postgresql",
       redis: redisConnected ? "connected" : "disconnected",
       rateLimit: { windowMs: RATE_LIMIT_WINDOW_MS, max: RATE_LIMIT_MAX },
+      clientSecretRequired: REQUIRE_CLIENT_SECRET,
       retry: { count: CHANNEL_RETRY_COUNT, baseMs: CHANNEL_RETRY_BASE_MS },
       captcha: {
         required: CAPTCHA_REQUIRED,
@@ -163,7 +165,7 @@ async function handleLeadRequest(request, response, origin, requestId) {
     return;
   }
 
-  if (SHARED_SECRET && !isValidSecret(request.headers["x-lead-relay-secret"], SHARED_SECRET)) {
+  if (REQUIRE_CLIENT_SECRET && !isValidSecret(request.headers["x-lead-relay-secret"], SHARED_SECRET)) {
     sendError(response, 401, "invalid_secret", "Invalid relay secret", requestId);
     return;
   }
@@ -409,7 +411,8 @@ async function handleMyLeadsRequest(request, response, origin, requestId) {
     if (!token) throw new Error("未登录或会话已过期");
     const payload = verifyUserToken(token);
     const { accountId, role } = payload.account;
-    const type = getSearchParam(request.url, "type") || role === "provider" ? "application" : "demand";
+    const requestedType = getSearchParam(request.url, "type");
+    const type = requestedType || (role === "provider" ? "application" : "demand");
     const leads = await getLeadsByAccount(accountId, type, 50);
     sendJson(response, 200, { ok: true, requestId, accountId, type, leads });
   } catch (error) {

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowRight, FileText, Search, ShieldCheck } from "lucide-react";
-import { authStorageKey, type LocalAccount } from "@/lib/auth";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { authStorageKey, authTokenStorageKey, type LocalAccount } from "@/lib/auth";
 
 type Submission = {
   type: string;
@@ -11,15 +12,67 @@ type Submission = {
   ok: boolean;
   partialFailure?: boolean;
   status?: string;
+  payload?: {
+    company?: string;
+    industry?: string;
+    painPoint?: string;
+    budgetRange?: string;
+    expectedDelivery?: string;
+  };
   submittedAt: string;
   results: Array<{ ok: boolean; channel: string; message: string }>;
+};
+
+type MineLeadsResponse = {
+  ok?: boolean;
+  requestId?: string;
+  leads?: Submission[];
+  error?: { message?: string };
+  message?: string;
 };
 
 export function BuyerDashboard() {
   const accountRaw = useSyncExternalStore(subscribe, getAccountSnapshot, getServerSnapshot);
   const submissionsRaw = useSyncExternalStore(subscribe, getSubmissionsSnapshot, getServerSnapshot);
+  const tokenRaw = useSyncExternalStore(subscribe, getTokenSnapshot, getServerSnapshot);
   const account = parseAccount(accountRaw);
-  const submissions = parseSubmissions(submissionsRaw).filter((s) => s.type === "demand");
+  const localSubmissions = useMemo(() => parseSubmissions(submissionsRaw).filter((s) => s.type === "demand"), [submissionsRaw]);
+  const [remoteSubmissions, setRemoteSubmissions] = useState<Submission[] | null>(null);
+  const [isLoadingRemote, setIsLoadingRemote] = useState(false);
+  const [remoteError, setRemoteError] = useState("");
+  const accountRole = account?.role;
+  const mineLeadsUrl = getMineLeadsUrl();
+  const canSyncRemote = accountRole === "buyer" && Boolean(tokenRaw) && Boolean(mineLeadsUrl);
+
+  useEffect(() => {
+    if (!canSyncRemote) return;
+    const controller = new AbortController();
+    async function loadMineLeads() {
+      setIsLoadingRemote(true);
+      setRemoteError("");
+      try {
+        const response = await fetch(mineLeadsUrl, {
+          headers: { Authorization: `Bearer ${tokenRaw}` },
+          signal: controller.signal
+        });
+        const body = (await response.json().catch(() => null)) as MineLeadsResponse | null;
+        if (!response.ok || body?.ok === false) {
+          throw new Error(body?.error?.message || body?.message || "需求列表读取失败");
+        }
+        setRemoteSubmissions(Array.isArray(body?.leads) ? body.leads : []);
+      } catch (caught) {
+        if (caught instanceof DOMException && caught.name === "AbortError") return;
+        setRemoteSubmissions(null);
+        setRemoteError(caught instanceof Error ? caught.message : "需求列表读取失败");
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingRemote(false);
+      }
+    }
+    void loadMineLeads();
+    return () => controller.abort();
+  }, [canSyncRemote, mineLeadsUrl, tokenRaw]);
+
+  const submissions = canSyncRemote && remoteSubmissions ? remoteSubmissions : localSubmissions;
 
   if (!account || account.role !== "buyer") {
     return (
@@ -68,7 +121,24 @@ export function BuyerDashboard() {
       </section>
 
       <section className="rounded-2xl bg-white p-6 ring-1 ring-stone-200">
-        <h2 className="text-xl font-bold">我的需求列表</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-bold">我的需求列表</h2>
+          {isLoadingRemote ? (
+            <span className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500">
+              <LoadingSpinner />
+              正在同步服务端记录
+            </span>
+          ) : remoteSubmissions ? (
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">已同步服务端</span>
+          ) : (
+            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-500">本地记录</span>
+          )}
+        </div>
+        {remoteError ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            服务端记录暂时不可用，当前展示本地提交记录。原因：{remoteError}
+          </div>
+        ) : null}
         {submissions.length === 0 ? (
           <div className="mt-5 rounded-xl bg-stone-50 p-6 text-center">
             <Search className="mx-auto h-6 w-6 text-stone-400" />
@@ -82,8 +152,16 @@ export function BuyerDashboard() {
             {submissions.map((submission) => (
               <div key={`${submission.requestId}-${submission.submittedAt}`} className="rounded-xl border border-stone-200 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="font-semibold text-stone-900">企业需求</span>
+                  <span className="font-semibold text-stone-900">{submission.payload?.company || "企业需求"}</span>
                   <StatusBadge ok={submission.ok} partialFailure={submission.partialFailure} />
+                </div>
+                {submission.payload?.painPoint ? (
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-stone-600">{submission.payload.painPoint}</p>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-stone-500">
+                  {submission.payload?.industry ? <span>行业：{submission.payload.industry}</span> : null}
+                  {submission.payload?.budgetRange ? <span>预算：{submission.payload.budgetRange}</span> : null}
+                  {submission.payload?.expectedDelivery ? <span>周期：{submission.payload.expectedDelivery}</span> : null}
                 </div>
                 <p className="mt-2 break-all text-xs text-stone-500">请求编号：{submission.requestId || "local-demo"}</p>
                 <p className="mt-1 text-xs text-stone-500">提交时间：{new Date(submission.submittedAt).toLocaleString("zh-CN")}</p>
@@ -148,6 +226,10 @@ function getSubmissionsSnapshot() {
   return window.localStorage.getItem("jiuzhang:submissions") || "";
 }
 
+function getTokenSnapshot() {
+  return window.localStorage.getItem(authTokenStorageKey) || "";
+}
+
 function getServerSnapshot() {
   return "";
 }
@@ -169,4 +251,18 @@ function parseSubmissions(raw: string): Submission[] {
   } catch {
     return [];
   }
+}
+
+function getMineLeadsUrl() {
+  const leadUrl = process.env.NEXT_PUBLIC_LEAD_RELAY_URL;
+  if (leadUrl) {
+    const base = leadUrl.replace(/\/$/, "");
+    return `${base.replace(/\/api\/leads$/, "/api/leads/mine")}?type=demand`;
+  }
+  const authUrl = process.env.NEXT_PUBLIC_AUTH_RELAY_URL;
+  if (authUrl) {
+    const base = authUrl.replace(/\/$/, "");
+    return `${base.replace(/\/api\/auth$/, "/api/leads/mine")}?type=demand`;
+  }
+  return "";
 }

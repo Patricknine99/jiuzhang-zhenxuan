@@ -28,7 +28,6 @@ LEAD_RELAY_DRY_RUN=true npm run relay:dev
 ```bash
 curl -X POST http://127.0.0.1:8787/api/leads \
   -H 'Content-Type: application/json' \
-  -H 'X-Lead-Relay-Secret: replace-with-your-local-secret' \
   -d '{
     "type": "demand",
     "company": "测试公司",
@@ -56,7 +55,8 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 
 - `LEAD_RELAY_DRY_RUN=false`
 - `LEAD_ALLOWED_ORIGINS` 只填写正式域名
-- `LEAD_RELAY_SECRET` 使用强随机字符串
+- `LEAD_RELAY_SECRET` 使用强随机字符串，用于签发用户、管理员会话 token
+- `LEAD_REQUIRE_CLIENT_SECRET=false` 适合浏览器表单提交；只有可信服务端调用方能保密 `X-Lead-Relay-Secret` 时才设为 `true`
 - `DATABASE_URL` 和 `REDIS_URL` 只放服务端环境变量，不要提交真实密码到 Git
 - 云端数据库通常由控制台先创建库和账号，保持 `DB_INIT_CREATE_DATABASE=false`，让 `npm run db:init` 只建表和导入种子数据
 - 只有本地角色明确拥有建库权限时，才设置 `DB_INIT_CREATE_DATABASE=true`
@@ -77,6 +77,7 @@ curl -X POST http://127.0.0.1:8787/api/leads \
 - **基础限流**：Redis 滑动窗口限流用于本地模拟与生产前验证；正式生产可再叠加云网关限流。
 - **请求约束**：限制 JSON body 64KB，并要求 `Content-Type: application/json`。
 - **防机器人**：按国内环境预留，优先接腾讯云验证码、阿里云验证码或极验。配置 `LEAD_CAPTCHA_REQUIRED=true` 后，线索和验证码接口都会先验证 token。
+- **客户端密钥**：浏览器不能安全保存 relay 密钥；公开表单默认依赖 Origin 白名单、验证码和限流。服务端到服务端调用可开启 `LEAD_REQUIRE_CLIENT_SECRET=true`。
 - **字段安全**：relay 会限制关键字段长度、去除控制字符，并校验手机号和来源 URL。
 - **账号密码**：relay 用 scrypt 哈希保存密码，账号与信任设备已持久化到 PostgreSQL。
 - **新设备验证**：注册必须输入验证码；登录先校验账号密码，若设备未信任，再要求短信或邮箱验证码。

@@ -74,6 +74,8 @@ DINGTALK_AT_MOBILES=
 
 当前主站未配置 `NEXT_PUBLIC_LEAD_RELAY_URL` 时，表单会以静态 Demo 模式直接进入成功页；配置后会向 relay 发送真实请求。
 
+浏览器表单不会携带 `LEAD_RELAY_SECRET`。该密钥只用于 relay 服务端签发用户/管理员 token；公开线索提交默认通过 `LEAD_ALLOWED_ORIGINS`、验证码与限流保护。若是可信服务端调用 relay，可设置 `LEAD_REQUIRE_CLIENT_SECRET=true` 并发送 `X-Lead-Relay-Secret`。
+
 ## 8. AI、账号与防机器人
 
 由 ChatGPT 于 2026-05-01 补充：
@@ -82,6 +84,7 @@ DINGTALK_AT_MOBILES=
 - 诊断 AI 接口环境变量：`NEXT_PUBLIC_DIAGNOSIS_AI_URL`
 - 悬浮客服 AI 接口环境变量：`NEXT_PUBLIC_SUPPORT_AI_URL`
 - 当前账号页：`/login`、`/register`、`/account`
+- 需求方工作台：`/buyers/dashboard`，配置 `NEXT_PUBLIC_LEAD_RELAY_URL` 且用户登录后，会调用 `GET /api/leads/mine?type=demand` 同步服务端线索；接口不可用时降级展示本地提交记录。
 - 当前已做手机号/邮箱 + 密码的基础登录注册流程。注册时必须验证码；登录先校验账号密码，若是这台设备首次登录该账号，再要求短信或邮箱验证码。
 - 未配置 `NEXT_PUBLIC_AUTH_RELAY_URL` 时仅用于静态演示，验证码固定为 `123456`；配置后会调用 relay 的 `/api/auth/code` 与 `/api/auth/session`，由服务端校验一次性验证码和设备信任状态。
 - 防机器人按国内环境预留：前端配置 `NEXT_PUBLIC_CAPTCHA_PROVIDER` 后显示校验占位；relay 配置 `LEAD_CAPTCHA_REQUIRED=true`、`CAPTCHA_PROVIDER` 与 `CAPTCHA_SECRET_KEY` 后强制验证。候选优先考虑腾讯云验证码、阿里云验证码或极验，不加载境外验证码脚本。

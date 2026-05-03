@@ -312,3 +312,31 @@
 
 *修复完成时间：2026-05-03*  
 *Git 提交：`22e3074`*
+
+---
+
+## 13. ChatGPT 接手改动 — 真实线索工作台与浏览器提交修复（2026-05-03）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **处理原因**：接手 SPEC4 后发现两个前后端衔接问题：需求方工作台仍只读本地提交记录，未消费新增的 `/api/leads/mine`；同时 relay 强制要求浏览器无法保密的 `X-Lead-Relay-Secret`，导致配置真实 relay 后公开表单会被 `401 invalid_secret` 拒绝。
+- **本批完成**：
+  1. **`relay/lead-relay.mjs`**：新增 `LEAD_REQUIRE_CLIENT_SECRET` 开关。`LEAD_RELAY_SECRET` 继续作为 token/HMAC 签名密钥保留并强制配置；公开浏览器表单默认不要求发送密钥，改由 Origin 白名单、验证码与限流保护。可信服务端调用方可设置 `LEAD_REQUIRE_CLIENT_SECRET=true` 后继续使用 `X-Lead-Relay-Secret`。
+  2. **`relay/lead-relay.mjs`**：修复 `/api/leads/mine` 类型选择的运算符优先级问题，确保 `?type=demand` 不会被 provider/buyer 默认逻辑误覆盖。
+  3. **`relay/database.mjs`**：个人线索查询结果补充返回 `payload`，让工作台可展示公司、行业、痛点、预算和交付周期。
+  4. **`components/buyers/BuyerDashboard.tsx`**：登录需求方进入工作台后，若已配置 relay 且本地有用户 token，会调用 `GET /api/leads/mine?type=demand` 同步服务端线索；请求失败时保留本地提交记录降级，并展示同步状态。
+  5. **`.env.example`、`relay/README.md`、`docs/integrations.md`**：补充浏览器提交不暴露 relay 密钥、服务端调用可选客户端密钥，以及工作台真实接口同步说明。
+- **新增/修改文件**：
+  - `relay/lead-relay.mjs`
+  - `relay/database.mjs`
+  - `components/buyers/BuyerDashboard.tsx`
+  - `.env.example`
+  - `relay/README.md`
+  - `docs/integrations.md`
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run test` 通过，33/33 测试通过。
+  3. `npm run verify:data` 通过。
+  4. `npm run lint` 通过。
+  5. `npm run build` 通过，64 页面静态生成成功。
+  6. 清理本项目卡死的旧 Next dev 进程后，在 `http://127.0.0.1:3100` 运行 `npm run smoke:routes` 通过，核心页面返回 200，未知动态路由返回 404。
