@@ -91,8 +91,8 @@
 | 序号 | 任务 | 状态 | 备注 |
 |------|------|------|------|
 | 1 | 需求方工作台 | ✅ 已完成 | `/buyers/dashboard` + BuyerDashboard + user token 体系 |
-| 2 | 供给方工作台 | 待开始 | |
-| 3 | 管理员真实数据 | 待开始 | |
+| 2 | 供给方工作台 | ✅ 已完成 | `/creators/dashboard` + ProviderDashboard |
+| 3 | 管理员真实数据 | ✅ 已完成 | `GET /api/admin/leads` + `/api/admin/audit` + AdminConsole API 对接 |
 | 4 | 支付闭环 | 待开始 | 需商户号 |
 | 5 | 消息通知 | 待开始 | 需云通信 |
 | 6 | 评价系统 | 待开始 | |

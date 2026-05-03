@@ -361,3 +361,36 @@
   4. `npm run test` 通过，33/33 测试通过。
   5. `npm run relay:check` 通过。
   6. 使用本地 Chrome headless 生成 390px/375px/320px 宽度截图检查首页、登录页和诊断页；移动端主流程已可在小屏纵向浏览，后续如需严格视觉验收建议补 Playwright 设备矩阵截图。
+
+---
+
+## 15. Kimi 2.6 改动 — 供给方工作台 + 管理员真实数据（2026-05-03）
+
+- **执行者**：Kimi 2.6
+- **状态**：已完成并通过验证
+- **处理原因**：实现 idea2 路线图中的 Sprint 2（供给方工作台）和 Sprint 3（管理员后台真实数据）。复用 Sprint 1 的用户 token 体系，打通前后端全链路。
+- **本批完成**：
+  **Sprint 2 — 供给方工作台**：
+  1. **`app/creators/dashboard/page.tsx`**：新增供给方工作台路由。
+  2. **`components/creators/ProviderDashboard.tsx`**：供给方工作台组件——登录检测（role=provider）、入驻申请列表（本地 + 远程同步）、指标卡片、状态标签、方向标签展示。
+  3. **`components/shared/Navbar.tsx`**：供给方下拉菜单新增「我的工作台」入口。
+
+  **Sprint 3 — 管理员真实数据**：
+  4. **`relay/lead-relay.mjs`**：新增 `GET /api/admin/leads` 端点（支持 `?type=demand/application` 筛选），新增 `GET /api/admin/audit` 端点（最近审计日志），均需 admin Bearer token 鉴权。
+  5. **`components/admin/AdminConsole.tsx`**：登录后自动从 relay 拉取真实线索和审计日志；线索队列按数据来源区分显示（服务端/本地）；审计预览展示最近 3 条操作记录；relay 不可用时降级为 localStorage。
+- **验证结果**：
+  1. `npm run relay:check` 通过。
+  2. `npm run lint` 通过。
+  3. `npm run build` 通过，静态生成 65 个页面（新增 `/creators/dashboard`）。
+- **新增文件**：
+  - `app/creators/dashboard/page.tsx`
+  - `components/creators/ProviderDashboard.tsx`
+- **修改文件**：
+  - `relay/lead-relay.mjs` — 导入 getRecentLeads/getRecentAuditLogs + admin leads/audit 端点
+  - `components/admin/AdminConsole.tsx` — 真实 API 对接 + 审计日志展示
+  - `components/shared/Navbar.tsx` — 供给方工作台入口
+
+---
+
+*修复完成时间：2026-05-03*  
+*Git 提交：`5810dab`*
