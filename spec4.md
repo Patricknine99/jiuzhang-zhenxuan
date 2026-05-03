@@ -276,5 +276,39 @@
 
 ---
 
+## 12. Kimi 2.6 改动 — 需求方工作台 + 用户认证 Token（2026-05-03）
+
+- **执行者**：Kimi 2.6
+- **状态**：已完成并通过验证
+- **处理原因**：实现「需求方工作台深化」——已登录的需求方可以查看自己提交的需求列表、跟进状态。同时引入用户认证 Token 体系，为后续供给方工作台和管理员真实数据对接打下基础设施。
+- **本批完成**：
+  1. **`relay/lead-relay.mjs`**：新增 `signUserToken()` / `verifyUserToken()` 函数（24 小时 TTL HMAC 签名），注册/登录时返回 token；新增 `GET /api/leads/mine` 端点，支持 Bearer token 鉴权，按 accountId + type 查询；线索提交时从 Authorization header 提取 accountId 写入 leads 表。
+  2. **`relay/database.mjs`**：`saveLead()` 新增可选 `accountId` 参数，写入 `leads.account_id`；新增 `getLeadsByAccount()` 按账号查询线索。
+  3. **`scripts/init-db.mjs`**：leads 表新增 `account_id VARCHAR(32)` 列 + 索引，含平滑迁移（`ADD COLUMN IF NOT EXISTS`）。
+  4. **`app/buyers/dashboard/page.tsx`**：新增需求方工作台路由。
+  5. **`components/buyers/BuyerDashboard.tsx`**：需求方工作台组件——登录检测、需求列表（本地提交记录）、指标卡片、状态标签、渠道分发结果。
+  6. **`components/auth/AuthPanel.tsx`**：登录/注册成功后保存 token 到 localStorage，类型定义更新。
+  7. **`components/shared/StaticForm.tsx`**：提交线索时附带 Authorization header（用户 token），使线索与提交者账号关联。
+  8. **`components/shared/Navbar.tsx`**：需求方下拉菜单新增「我的工作台」入口。
+  9. **`lib/auth.ts`**：新增 `authTokenStorageKey` 常量。
+- **验证结果**：
+  1. `npm run db:init` 通过：leads 表迁移成功，5 个服务商 + 4 个案例 seed 正常。
+  2. `npm run relay:check` 通过。
+  3. `npm run lint` 通过。
+  4. `npm run build` 通过，静态生成 64 个页面（新增 `/buyers/dashboard`）。
+- **新增文件**：
+  - `app/buyers/dashboard/page.tsx`
+  - `components/buyers/BuyerDashboard.tsx`
+- **修改文件**：
+  - `relay/lead-relay.mjs` — 用户 token + /api/leads/mine 端点
+  - `relay/database.mjs` — account_id 支持 + getLeadsByAccount
+  - `scripts/init-db.mjs` — leads 表 account_id 迁移
+  - `components/auth/AuthPanel.tsx` — token 存储 + 类型
+  - `components/shared/StaticForm.tsx` — 线索关联账号
+  - `components/shared/Navbar.tsx` — 工作台入口
+  - `lib/auth.ts` — token 存储键
+
+---
+
 *修复完成时间：2026-05-03*  
-*Git 提交：`910c91c`*
+*Git 提交：`22e3074`*
