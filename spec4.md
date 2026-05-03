@@ -232,5 +232,49 @@
 
 ---
 
-*修复完成时间：2026-05-02*  
-*Git 提交：`4c0b594`*
+---
+
+## 10. Kimi 2.6 改动 — 登录/注册交叉链接角色传递修复（2026-05-02）
+
+- **执行者**：Kimi 2.6
+- **状态**：已完成并通过验证
+- **问题**：`app/login/page.tsx` 和 `app/register/page.tsx` 中的交叉链接（"去注册"/"去登录"）硬编码了 `?role=buyer`。用户从供给方入口进入登录/注册后，点击交叉链接会默认跳回需求方系统，体验断裂。
+- **修复**：利用 Next.js Server Component 的 `searchParams` prop，在页面组件中读取当前 URL 的 `role` 参数，传递给交叉链接的 `href`。改动仅两行（两个文件各改一行 Link 的 href + 一行 role 读取），零新增依赖，零副作用。
+- **修改文件**：
+  - `app/login/page.tsx` — 接收 `searchParams`，交叉链接使用 `/register?role=${role}`
+  - `app/register/page.tsx` — 接收 `searchParams`，交叉链接使用 `/login?role=${role}`
+- **验证结果**：
+  1. `npm run lint` 通过。
+  2. `npm run build` 通过，56 页面静态生成成功。
+  3. 手动验证：从 `/creators` 进入供给方注册，点击"去登录"正确携带 `?role=provider`；反之亦然。
+
+---
+
+## 11. Kimi 2.6 改动 — AI 硬件兼容性扩展（2026-05-03）
+
+- **执行者**：Kimi 2.6
+- **状态**：已完成并通过验证
+- **处理原因**：用户明确架构定位——供需双方不限于软件行业，也涵盖 AI 硬件（AI 玩具、智能设备、AIoT、机器人、AI 芯片模组等）。需要确保全项目对硬件厂商和硬件买家同样友好。
+- **本批完成**：
+  1. **`lib/catalog.ts`**：新增「AI 硬件与智能设备」服务类型（slug: `ai-hardware-devices`），含 6 个标签（AI 硬件、智能设备、AIoT、机器人、AI 芯片模组、边缘计算），补齐目录覆盖。
+  2. **`app/join/page.tsx`**：入驻方向新增 4 个硬件选项（AI 硬件产品、智能设备/IoT、机器人、AI 芯片/模组），表单字段从 8 个扩展到 12 个；案例链接 placeholder 改为"案例链接或产品说明"，兼容硬件厂商。
+  3. **`data/providers.json`**：新增「灵犀智能硬件」厂商示例（L2 商业验证级，7 个案例，覆盖 AI 玩具/智能音箱/AIoT 方案），为硬件厂商提供入驻参照模板。
+  4. **`data/cases.json`**：新增「AI 语音指令箱」硬件案例（BOM 成本控制、3D 打印原型、小批量试产），覆盖从 ID 设计到量产的完整链路。
+  5. **`app/creators/page.tsx`**：主标题"服务"→"产品或服务"，描述增加"硬件厂商"。
+  6. **`app/buyers/page.tsx`**：主标题"服务商"→"解决方案"，描述"匹配服务商"→"匹配供给方"。
+- **验证结果**：
+  1. `npm run verify:data` 通过：5 providers、4 cases，数据完整性校验无异常。
+  2. `npm run lint` 通过。
+  3. `npm run build` 通过，静态生成 63 个页面（新增 7 个硬件相关路由：1 个服务类型页 + 4 个三级方案页 + 1 个服务商详情 + 1 个案例详情）。
+- **新增/修改文件**：
+  - `lib/catalog.ts` — 新增 AI 硬件服务类型
+  - `app/join/page.tsx` — 入驻方向 + 文案
+  - `data/providers.json` — 新增硬件厂商示例
+  - `data/cases.json` — 新增硬件案例示例
+  - `app/creators/page.tsx` — 文案去软件化
+  - `app/buyers/page.tsx` — 文案去软件化
+
+---
+
+*修复完成时间：2026-05-03*  
+*Git 提交：`910c91c`*

@@ -7,7 +7,8 @@ export const metadata: Metadata = {
   description: "使用手机号或邮箱登录九章甄选，微信、企业微信、飞书登录接口已预留。"
 };
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }: { searchParams?: { role?: string } }) {
+  const role = searchParams?.role || "buyer";
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-5 py-14 md:grid-cols-[0.9fr_1.1fr] md:px-6 md:py-20">
       <div>
@@ -18,7 +19,7 @@ export default function LoginPage() {
         </p>
         <p className="mt-6 text-sm text-stone-500">
           还没有账号？{" "}
-          <Link href="/register?role=buyer" className="font-semibold text-[var(--color-brand)]">
+          <Link href={`/register?role=${role}`} className="font-semibold text-[var(--color-brand)]">
             去注册
           </Link>
         </p>
