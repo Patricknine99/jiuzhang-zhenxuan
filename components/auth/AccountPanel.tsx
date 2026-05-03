@@ -24,7 +24,7 @@ export function AccountPanel() {
       <div className="rounded-2xl bg-white p-8 text-center ring-1 ring-stone-200">
         <h1 className="text-2xl font-bold">还没有登录</h1>
         <p className="mt-3 text-stone-600">登录或注册后，后续可以查看需求诊断、服务商入驻状态和人工跟进记录。</p>
-        <div className="mt-6 flex justify-center gap-3">
+        <div className="mt-6 grid gap-3 sm:flex sm:justify-center">
           <Link href="/login?role=buyer" className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold">
             需求方登录
           </Link>
@@ -49,18 +49,18 @@ export function AccountPanel() {
         <Info label="账号系统" value={account.role === "provider" ? "供给方系统" : "需求方系统"} />
         <Info label="创建时间" value={new Date(account.createdAt).toLocaleString("zh-CN")} />
       </dl>
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Link href={accountHome} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white">
+      <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
+        <Link href={accountHome} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white">
           {account.role === "provider" ? <Building2 className="h-4 w-4" /> : <Search className="h-4 w-4" />}
           进入{account.role === "provider" ? "供给方" : "需求方"}入口
         </Link>
         {account.role === "provider" ? (
-          <Link href="/join" className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700">
+          <Link href="/join" className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700">
             <Sparkles className="h-4 w-4" />
             管理入驻申请
           </Link>
         ) : (
-          <Link href="/post-demand" className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700">
+          <Link href="/post-demand" className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-stone-700">
             <FileText className="h-4 w-4" />
             发布需求
           </Link>

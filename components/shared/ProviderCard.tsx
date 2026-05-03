@@ -10,8 +10,8 @@ export function ProviderCard({ provider }: { provider: Provider }) {
       href={`/providers/${provider.slug}`}
       className="editorial-card flex h-full flex-col overflow-hidden rounded-2xl bg-white"
     >
-      <div className="flex flex-1 flex-col p-6">
-        <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <h3 className="text-lg font-bold text-stone-950">{provider.name}</h3>
             <p className="mt-2 text-sm leading-6 text-stone-500">{provider.description}</p>
@@ -44,7 +44,7 @@ export function ProviderCard({ provider }: { provider: Provider }) {
           </div>
         </dl>
       </div>
-      <div className="flex items-center justify-between border-t border-stone-100 bg-stone-50 px-6 py-4 text-sm">
+      <div className="flex flex-col gap-3 border-t border-stone-100 bg-stone-50 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <span className="flex items-center text-stone-500">
           <Star className="mr-1 h-4 w-4 fill-[var(--color-brand)] text-[var(--color-brand)]" />
           <strong className="mr-1 text-stone-950">{provider.rating.toFixed(1)}</strong>

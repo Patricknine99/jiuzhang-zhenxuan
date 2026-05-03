@@ -43,14 +43,21 @@
 }
 
 html {
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
+  min-width: 320px;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -58,11 +65,33 @@ a {
   text-decoration: none;
 }
 
+h1,
+h2,
+h3,
+p,
+dd,
+li {
+  overflow-wrap: anywhere;
+}
+
 button,
 input,
 select,
 textarea {
   font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: rgba(194, 65, 12, 0.16);
+}
+
+button {
+  touch-action: manipulation;
+}
+
+main {
+  min-width: 0;
 }
 
 .font-serif {
@@ -93,11 +122,13 @@ textarea {
 
 .field {
   width: 100%;
+  min-height: 48px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: white;
   padding: 12px 14px;
   color: var(--color-text-primary);
+  font-size: 16px;
   outline: none;
 }
 
@@ -147,4 +178,41 @@ textarea {
 .prose-page li {
   color: var(--color-text-secondary);
   line-height: 1.9;
+}
+
+.mobile-scrollbar {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --section-gap: 56px;
+  }
+
+  .editorial-card:hover {
+    box-shadow: none;
+    transform: none;
+  }
+
+  .prose-page h2 {
+    margin-top: 28px;
+    font-size: 1.18rem;
+  }
+}
+
+@media (max-width: 360px) {
+  h1 {
+    font-size: 1.55rem;
+    line-height: 1.22;
+  }
+
+  h2 {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
 }

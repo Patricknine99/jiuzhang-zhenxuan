@@ -5,12 +5,12 @@ import { industryCategories, serviceCategories } from "@/lib/catalog";
 export function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200 bg-stone-50/90 backdrop-blur">
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 md:px-6">
+      <nav className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-5 md:px-6">
         <Link href="/" className="flex items-center gap-2.5" aria-label="九章甄选首页">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-950 text-sm font-bold text-white font-serif">
             甄
           </span>
-          <span className="font-serif text-xl font-bold tracking-normal">九章甄选</span>
+          <span className="font-serif text-lg font-bold tracking-normal sm:text-xl">九章甄选</span>
         </Link>
         <div className="hidden items-center gap-7 md:flex">
           <Dropdown
@@ -92,41 +92,42 @@ export function Navbar() {
             后台
           </Link>
           <Link
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-orange-900/10 hover:bg-[var(--color-brand-hover)]"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-[var(--color-brand)] px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-orange-900/10 hover:bg-[var(--color-brand-hover)] sm:gap-2 sm:px-4"
             href="/diagnosis"
           >
             <Send className="h-4 w-4" />
-            AI 诊断
+            <span className="hidden min-[360px]:inline">AI 诊断</span>
+            <span className="min-[360px]:hidden">诊断</span>
           </Link>
         </div>
       </nav>
-      <nav className="border-t border-stone-200 px-5 py-2 md:hidden" aria-label="移动端主导航">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 overflow-x-auto whitespace-nowrap text-sm font-medium text-stone-600">
-          <Link href="/providers" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+      <nav className="border-t border-stone-200 px-4 py-2 md:hidden" aria-label="移动端主导航">
+        <div className="mobile-scrollbar mx-auto flex max-w-6xl items-center gap-2 overflow-x-auto whitespace-nowrap text-sm font-medium text-stone-600">
+          <Link href="/providers" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             服务商
           </Link>
-          <Link href="/buyers" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/buyers" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             需求方
           </Link>
-          <Link href="/creators" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/creators" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             供给方
           </Link>
-          <Link href="/services" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/services" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             服务类型
           </Link>
-          <Link href="/industries" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/industries" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             行业方案
           </Link>
-          <Link href="/cases" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/cases" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             商业案例
           </Link>
-          <Link href="/sla" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/sla" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             验收标准
           </Link>
-          <Link href="/login?role=buyer" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/login?role=buyer" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             登录
           </Link>
-          <Link href="/admin" className="shrink-0 rounded-lg px-2.5 py-1.5 hover:bg-stone-100 hover:text-stone-950">
+          <Link href="/admin" className="flex min-h-10 shrink-0 items-center rounded-lg px-2.5 hover:bg-stone-100 hover:text-stone-950">
             后台
           </Link>
         </div>

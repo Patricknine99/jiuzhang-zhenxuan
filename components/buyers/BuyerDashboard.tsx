@@ -80,7 +80,7 @@ export function BuyerDashboard() {
         <ShieldCheck className="mx-auto h-10 w-10 text-[var(--color-brand)]" />
         <h1 className="mt-4 text-2xl font-bold">请先登录需求方账号</h1>
         <p className="mt-3 text-stone-600">需求方工作台需要登录后才能查看已发布的需求和跟进状态。</p>
-        <div className="mt-6 flex justify-center gap-3">
+        <div className="mt-6 grid gap-3 sm:flex sm:justify-center">
           <Link href="/login?role=buyer" className="rounded-xl bg-[var(--color-brand)] px-6 py-3 text-sm font-semibold text-white">
             登录需求方账号
           </Link>

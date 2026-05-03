@@ -177,12 +177,12 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         {needsVerification ? (
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-stone-700">{method === "phone" ? "短信验证码" : "邮箱验证码"}</span>
-            <div className="grid grid-cols-[1fr_auto] gap-2">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
               <input className="field" value={code} onChange={(event) => setCode(event.target.value)} placeholder="6 位数字" inputMode="numeric" required disabled={isSubmitting} />
               <button
                 type="button"
                 disabled={isSendingCode}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-stone-300 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={async () => {
                   setIsSendingCode(true);
                   setError("");

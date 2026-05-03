@@ -189,7 +189,7 @@ export default function HomePage() {
         </p>
         <Link
           href="/diagnosis"
-          className="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-9 py-4 text-lg font-bold text-white shadow-lg shadow-orange-900/20 hover:bg-[var(--color-brand-hover)]"
+          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-6 py-4 text-base font-bold text-white shadow-lg shadow-orange-900/20 hover:bg-[var(--color-brand-hover)] sm:w-auto sm:px-9 sm:text-lg"
         >
           开始免费需求诊断 <ArrowRight className="h-5 w-5" />
         </Link>

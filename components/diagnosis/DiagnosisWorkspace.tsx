@@ -57,7 +57,7 @@ export function DiagnosisWorkspace() {
         <div className="space-y-4">
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user" ? "bg-[var(--color-brand)] text-white" : "bg-stone-100 text-stone-700"}`}>
+              <div className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-7 sm:max-w-[82%] ${message.role === "user" ? "bg-[var(--color-brand)] text-white" : "bg-stone-100 text-stone-700"}`}>
                 {message.text}
               </div>
             </div>
@@ -66,7 +66,7 @@ export function DiagnosisWorkspace() {
 
         {currentQuestion ? (
           <form
-            className="mt-6 grid grid-cols-[1fr_auto] gap-2"
+            className="mt-6 grid gap-2 sm:grid-cols-[1fr_auto]"
             onSubmit={async (event) => {
               event.preventDefault();
               if (!input.trim() || isLoading) return;
@@ -84,7 +84,7 @@ export function DiagnosisWorkspace() {
             }}
           >
             <input className="field" value={input} onChange={(event) => setInput(event.target.value)} placeholder="输入你的回答" disabled={isLoading} />
-            <button type="submit" disabled={isLoading} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand)] px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={isLoading} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
               {isLoading ? <LoadingSpinner /> : <Send className="h-4 w-4" />}
               {isLoading ? "生成中" : "发送"}
             </button>

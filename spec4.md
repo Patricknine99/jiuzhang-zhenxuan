@@ -340,3 +340,24 @@
   4. `npm run lint` 通过。
   5. `npm run build` 通过，64 页面静态生成成功。
   6. 清理本项目卡死的旧 Next dev 进程后，在 `http://127.0.0.1:3100` 运行 `npm run smoke:routes` 通过，核心页面返回 200，未知动态路由返回 404。
+
+---
+
+## 14. ChatGPT 接手改动 — 移动端与未来 App 容器适配基础（2026-05-03）
+
+- **执行者**：ChatGPT
+- **状态**：已完成并通过验证
+- **处理原因**：用户明确要求当前网页不能只适配电脑端，需要在现有基础上做好手机端体验，并为后续封装 iOS/Android 应用容器预留基础。
+- **本批完成**：
+  1. **全局移动壳**：`app/layout.tsx` 新增 `viewportFit: "cover"`、`themeColor`、`appleWebApp` 与格式识别控制，为 iOS/Android WebView 或 PWA 外壳预留更稳的系统栏表现。
+  2. **全局 CSS 基础**：`app/globals.css` 增加横向溢出约束、最小 320px 支持、iOS 输入框 16px 防缩放、触控高亮、按钮触控优化、移动端 hover 降噪、窄屏标题和长文本换行保护。
+  3. **移动导航**：`components/shared/Navbar.tsx` 调整移动端顶部栏间距、CTA 文案在窄屏收缩，并隐藏横向导航滚动条但保留滑动能力；移动导航触控高度提升到 40px+。
+  4. **高频交互区**：`FloatingSupport`、`DiagnosisWorkspace`、`AuthPanel` 在手机端改为单列输入/按钮布局，客服窗使用 `100dvh` 和 `safe-area-inset-bottom`，避免被键盘、底部安全区或小屏宽度挤压。
+  5. **卡片与账号页**：服务商卡片、账号页、需求方工作台登录提示在手机端改为更稳的纵向按钮和信息布局，减少徽章、底部操作区和 CTA 横向挤压。
+- **验证结果**：
+  1. `npm run lint` 通过。
+  2. `npm run build` 通过，64 页面静态生成成功。
+  3. `npm run smoke:routes` 在 `http://127.0.0.1:3100` 通过，核心页面返回 200，未知动态路由返回 404。
+  4. `npm run test` 通过，33/33 测试通过。
+  5. `npm run relay:check` 通过。
+  6. 使用本地 Chrome headless 生成 390px/375px/320px 宽度截图检查首页、登录页和诊断页；移动端主流程已可在小屏纵向浏览，后续如需严格视觉验收建议补 Playwright 设备矩阵截图。

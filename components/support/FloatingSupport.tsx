@@ -23,9 +23,9 @@ export function FloatingSupport() {
   ]);
 
   return (
-    <div className="fixed bottom-5 right-5 z-[80]">
+    <div className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[80] flex flex-col items-end sm:left-auto sm:right-5 sm:bottom-5">
       {open ? (
-        <div className="mb-3 w-[calc(100vw-40px)] max-w-sm overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl shadow-stone-950/20">
+        <div className="mb-3 max-h-[calc(100dvh-7.5rem-env(safe-area-inset-bottom))] w-full max-w-md overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl shadow-stone-950/20 sm:w-[calc(100vw-40px)] sm:max-w-sm">
           <div className="flex items-center justify-between bg-stone-950 px-4 py-3 text-white">
             <div className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-orange-200" />
@@ -38,7 +38,7 @@ export function FloatingSupport() {
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="max-h-80 space-y-3 overflow-y-auto p-4">
+          <div className="max-h-[calc(100dvh-17rem-env(safe-area-inset-bottom))] min-h-40 space-y-3 overflow-y-auto p-4 sm:max-h-80">
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={message.role === "user" ? "text-right" : "text-left"}>
                 <span
@@ -72,7 +72,7 @@ export function FloatingSupport() {
             ) : null}
           </div>
           <div className="border-t border-stone-100 p-3">
-            <div className="mb-2 flex gap-2">
+            <div className="mb-2 flex flex-wrap gap-2">
               <button type="button" disabled={isReplying} className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 disabled:opacity-50" onClick={() => quickAsk("我想找服务商")}>
                 找服务商
               </button>
@@ -84,7 +84,7 @@ export function FloatingSupport() {
               </button>
             </div>
             <form
-              className="grid grid-cols-[1fr_auto] gap-2"
+              className="grid gap-2 sm:grid-cols-[1fr_auto]"
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!input.trim() || isReplying) return;
@@ -93,7 +93,7 @@ export function FloatingSupport() {
               }}
             >
               <input className="field py-2 text-sm" value={input} onChange={(event) => setInput(event.target.value)} placeholder="输入你的问题" disabled={isReplying} />
-              <button type="submit" disabled={isReplying} className="rounded-xl bg-[var(--color-brand)] px-3 text-white disabled:opacity-60">
+              <button type="submit" disabled={isReplying} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--color-brand)] px-3 text-white disabled:opacity-60">
                 {isReplying ? <LoadingSpinner /> : <Send className="h-4 w-4" />}
               </button>
             </form>
