@@ -13,6 +13,8 @@ import {
   verifyAuthCode as dbVerifyAuthCode,
   writeAuditLog,
   getLeadsByAccount,
+  getRecentLeads,
+  getRecentAuditLogs,
   closeDatabaseConnections
 } from "./database.mjs";
 import { consumeRateLimitRedis, checkSendCooldown, redis } from "./redis.mjs";
@@ -141,6 +143,16 @@ const server = createServer(async (request, response) => {
 
   if (pathname === "/api/admin/me") {
     await handleAdminMeRequest(request, response, origin, requestId);
+    return;
+  }
+
+  if (pathname === "/api/admin/leads" && request.method === "GET") {
+    await handleAdminLeadsRequest(request, response, origin, requestId);
+    return;
+  }
+
+  if (pathname === "/api/admin/audit" && request.method === "GET") {
+    await handleAdminAuditRequest(request, response, origin, requestId);
     return;
   }
 
@@ -521,6 +533,40 @@ async function handleAdminMeRequest(request, response, origin, requestId) {
     const token = getBearerToken(request);
     const payload = verifyAdminToken(token);
     sendJson(response, 200, { ok: true, requestId, account: payload.account, expiresAt: payload.expiresAt });
+  } catch (error) {
+    sendError(response, 401, "invalid_admin_session", error instanceof Error ? error.message : "Invalid admin session", requestId);
+  }
+}
+
+async function handleAdminLeadsRequest(request, response, origin, requestId) {
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  try {
+    const token = getBearerToken(request);
+    verifyAdminToken(token);
+    const type = getSearchParam(request.url, "type");
+    const limit = Math.min(Number(getSearchParam(request.url, "limit") || "50"), 200);
+    const leads = await getRecentLeads(limit);
+    const filtered = type ? leads.filter((lead) => lead.type === type) : leads;
+    sendJson(response, 200, { ok: true, requestId, total: filtered.length, leads: filtered });
+  } catch (error) {
+    sendError(response, 401, "invalid_admin_session", error instanceof Error ? error.message : "Invalid admin session", requestId);
+  }
+}
+
+async function handleAdminAuditRequest(request, response, origin, requestId) {
+  if (!isAllowedOrigin(origin)) {
+    sendError(response, 403, "origin_not_allowed", "Origin is not allowed", requestId);
+    return;
+  }
+  try {
+    const token = getBearerToken(request);
+    verifyAdminToken(token);
+    const limit = Math.min(Number(getSearchParam(request.url, "limit") || "50"), 200);
+    const logs = await getRecentAuditLogs(limit);
+    sendJson(response, 200, { ok: true, requestId, total: logs.length, logs });
   } catch (error) {
     sendError(response, 401, "invalid_admin_session", error instanceof Error ? error.message : "Invalid admin session", requestId);
   }

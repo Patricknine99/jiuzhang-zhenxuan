@@ -53,6 +53,7 @@ export function Navbar() {
                 title: "服务商入口",
                 links: [
                   { href: "/creators", label: "供给方入口", description: "了解认证、案例包装和接单路径。" },
+                  { href: "/creators/dashboard", label: "我的工作台", description: "已登录供给方查看入驻状态与接单机会。" },
                   { href: "/login?role=provider", label: "供给方登录", description: "进入服务商系统，查看入驻与接单准备。" },
                   { href: "/join", label: "服务商入驻", description: "提交团队信息、案例、技术栈和预算区间。" },
                   { href: "/provider-agreement", label: "服务商协议", description: "查看交付、版权、验收与平台规则。" }

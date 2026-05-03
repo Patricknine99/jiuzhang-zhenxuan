@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, ClipboardList, KeyRound, LockKeyhole, ShieldCheck, UserCog, WalletCards } from "lucide-react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import {
@@ -38,6 +38,26 @@ type AdminRelayResponse = {
   error?: { message?: string };
 };
 
+type AdminLeadsResponse = {
+  ok?: boolean;
+  total?: number;
+  leads?: Submission[];
+  error?: { message?: string };
+};
+
+type AdminAuditResponse = {
+  ok?: boolean;
+  total?: number;
+  logs?: Array<{
+    actor: string;
+    action: string;
+    resource: string;
+    details?: Record<string, unknown>;
+    created_at: string;
+  }>;
+  error?: { message?: string };
+};
+
 const priorityTasks = [
   "核查今日新增企业需求，24 小时内完成首次联系",
   "处理服务商入驻申请，补齐案例链接和开票信息",
@@ -53,7 +73,47 @@ export function AdminConsole() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submissions = useMemo(() => readSubmissions(), []);
+  const localSubmissions = useMemo(() => readSubmissions(), []);
+  const [adminLeads, setAdminLeads] = useState<Submission[] | null>(null);
+  const [auditLogs, setAuditLogs] = useState<Array<{ actor: string; action: string; resource: string; created_at: string }> | null>(null);
+  const [isLoadingAdminData, setIsLoadingAdminData] = useState(false);
+  const adminRelayUrl = process.env.NEXT_PUBLIC_ADMIN_RELAY_URL;
+  const canSyncAdmin = Boolean(adminRelayUrl);
+
+  const submissions = canSyncAdmin && adminLeads ? adminLeads : localSubmissions;
+
+  // Fetch real admin data from relay when configured
+  useEffect(() => {
+    if (!canSyncAdmin || !session?.token) return;
+    const token = session.token;
+    const relayUrl = adminRelayUrl as string;
+    const controller = new AbortController();
+    async function loadAdminData() {
+      setIsLoadingAdminData(true);
+      try {
+        const baseUrl = relayUrl.replace(/\/$/, "");
+        const headers = { Authorization: `Bearer ${token}` };
+        const [leadsRes, auditRes] = await Promise.all([
+          fetch(`${baseUrl}/leads`, { headers, signal: controller.signal }),
+          fetch(`${baseUrl}/audit`, { headers, signal: controller.signal })
+        ]);
+        const leadsBody = (await leadsRes.json().catch(() => null)) as AdminLeadsResponse | null;
+        if (leadsRes.ok && leadsBody?.ok && leadsBody.leads) {
+          setAdminLeads(leadsBody.leads);
+        }
+        const auditBody = (await auditRes.json().catch(() => null)) as AdminAuditResponse | null;
+        if (auditRes.ok && auditBody?.ok && auditBody.logs) {
+          setAuditLogs(auditBody.logs.slice(0, 10));
+        }
+      } catch (caught) {
+        if (caught instanceof DOMException && caught.name === "AbortError") return;
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingAdminData(false);
+      }
+    }
+    void loadAdminData();
+    return () => controller.abort();
+  }, [canSyncAdmin, adminRelayUrl, session?.token]);
 
   if (!session) {
     return (
@@ -140,7 +200,7 @@ export function AdminConsole() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard icon={<ClipboardList className="h-5 w-5" />} label="待处理线索" value={String(submissions.length)} />
+        <MetricCard icon={<ClipboardList className="h-5 w-5" />} label="待处理线索" value={String(adminLeads ? adminLeads.length : submissions.length)} />
         <MetricCard icon={<UserCog className="h-5 w-5" />} label="当前角色" value={adminRoleLabels[account.role]} />
         <MetricCard icon={<ShieldCheck className="h-5 w-5" />} label="权限数量" value={String(account.permissions.length)} />
         <MetricCard icon={<WalletCards className="h-5 w-5" />} label="支付模块" value={hasAdminPermission(account, "payments:review") ? "可查看" : "无权限"} />
@@ -150,7 +210,16 @@ export function AdminConsole() {
         <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-200">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-bold">线索处理队列</h2>
-            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">本地最近 10 条</span>
+            {isLoadingAdminData ? (
+              <span className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
+                <LoadingSpinner />
+                同步中
+              </span>
+            ) : adminLeads ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">服务端 {adminLeads.length} 条</span>
+            ) : (
+              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">本地最近 10 条</span>
+            )}
           </div>
           {hasAdminPermission(account, "leads:read") ? <LeadQueue submissions={submissions} canAssign={hasAdminPermission(account, "leads:assign")} /> : <NoPermission />}
         </div>
@@ -170,7 +239,7 @@ export function AdminConsole() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <PermissionMatrix role={account.role} />
-        <AuditPreview account={account} />
+        <AuditPreview account={account} auditLogs={auditLogs} />
       </section>
     </div>
   );
@@ -234,14 +303,26 @@ function PermissionMatrix({ role }: { role: AdminRole }) {
   );
 }
 
-function AuditPreview({ account }: { account: AdminAccount }) {
+function AuditPreview({ account, auditLogs }: { account: AdminAccount; auditLogs: Array<{ actor: string; action: string; resource: string; created_at: string }> | null }) {
   return (
     <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-200">
       <h2 className="text-xl font-bold">审计预览</h2>
       <div className="mt-5 space-y-3 text-sm">
         <AuditRow label="管理员登录" value={`${account.email} / ${new Date().toLocaleString("zh-CN")}`} />
         <AuditRow label="权限角色" value={adminRoleLabels[account.role]} />
-        <AuditRow label="下一步" value="接入数据库后记录每次分配、审核、支付复核和系统设置变更。" />
+        {auditLogs && auditLogs.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-stone-400">最近操作</p>
+            {auditLogs.slice(0, 3).map((log, index) => (
+              <div key={index} className="rounded-xl bg-stone-50 p-3">
+                <p className="text-xs font-semibold text-stone-700">{log.action}</p>
+                <p className="mt-0.5 text-xs text-stone-500">{log.actor} · {new Date(log.created_at).toLocaleString("zh-CN")}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <AuditRow label="下一步" value="接入数据库后记录每次分配、审核、支付复核和系统设置变更。" />
+        )}
       </div>
     </div>
   );
